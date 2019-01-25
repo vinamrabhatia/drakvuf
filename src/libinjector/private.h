@@ -139,4 +139,58 @@ static const char* offset_names[OFFSET_MAX][2] =
     [KTRAP_FRAME_RIP] = {"_KTRAP_FRAME", "Rip" },
 };
 
+struct injector
+{
+    // Inputs:
+    unicode_string_t* target_file_us;
+    reg_t target_cr3;
+    vmi_pid_t target_pid;
+    uint32_t target_tid;
+    unicode_string_t* cwd_us;
+    bool break_loop_on_detection;
+
+    // Internal:
+    drakvuf_t drakvuf;
+    bool is32bit, hijacked, resumed, detected;
+    injection_method_t method;
+    addr_t exec_func;
+    reg_t target_rsp;
+
+    union {
+        // For create process
+        struct {
+            addr_t resume_thread;
+        };
+
+        // For shellcode execution
+        struct {
+            addr_t payload, payload_addr, memset;
+            size_t binary_size, payload_size;
+            uint32_t status;
+        };
+
+        // For process doppelganging shellcode
+        struct {
+            addr_t binary, binary_addr, saved_bp;
+            addr_t process_notify;
+        };
+    };
+
+    const char* binary_path;
+    const char* target_process;
+
+    addr_t process_info;
+    x86_registers_t saved_regs;
+
+    drakvuf_trap_t bp;
+    GSList* memtraps;
+
+    size_t offsets[OFFSET_MAX];
+
+    // Results:
+    int rc;
+    uint32_t pid, tid;
+    uint64_t hProc, hThr;
+};
+
 #endif
