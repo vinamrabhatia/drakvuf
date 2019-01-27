@@ -160,7 +160,7 @@ struct injector
         };
 
         // For shellcode execution
-        /*struct {
+        struct {
             gpointer payload;
             addr_t payload_addr, memset;
             size_t binary_size, payload_size;
@@ -170,7 +170,7 @@ struct injector
         struct {
             gpointer binary;
             addr_t binary_addr, saved_bp, process_notify;
-        };*/
+        };
     };
 
     uint32_t status;

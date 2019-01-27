@@ -136,8 +136,18 @@ static void free_injector(injector_t injector)
     vmi_free_unicode_str(injector->target_file_us);
     vmi_free_unicode_str(injector->cwd_us);
 
-    //g_free(injector->binary);
-    //g_free(injector->payload);
+    switch(injector->method) {
+#ifdef ENABLE_DOPPELGANGING
+        case INJECT_METHOD_DOPP:
+            g_free(injector->binary);
+            /* fall-through */
+#endif
+        case INJECT_METHOD_SHELLCODE:
+            g_free(injector->payload);
+            break;
+        default:
+            break;
+    };
     g_free((gpointer)injector);
 }
 
@@ -188,7 +198,7 @@ static bool inject(drakvuf_t drakvuf, injector_t injector)
     return true;
 }
 
-/*static bool load_file_to_memory(gpointer* output, size_t* size, const char* file)
+static bool load_file_to_memory(gpointer* output, size_t* size, const char* file)
 {
     size_t payload_size = 0;
     unsigned char* data = NULL;
@@ -224,7 +234,7 @@ static bool inject(drakvuf_t drakvuf, injector_t injector)
     fclose(fp);
 
     return true;
-}*/
+}
 
 static void print_injection_info(output_format_t format, vmi_pid_t pid, uint64_t dtb, const char* file, vmi_pid_t injected_pid, uint32_t injected_tid)
 {
@@ -317,10 +327,11 @@ static bool initialize_injector_functions(injector_t injector, const char* file,
             break;
 
         case INJECT_METHOD_SHELLEXEC:
-            injector->exec_func = get_function_va(drakvuf, eprocess_base, "shell32.dll", "ShellExecuteW");
+            if ( !init_shellexec(injector, eprocess_base ) )
+                return false;
             break;
 
-        /*case INJECT_METHOD_SHELLCODE:
+        case INJECT_METHOD_SHELLCODE:
             // Read shellcode from a file
             if ( !load_file_to_memory(&injector->payload, &injector->payload_size, file) )
                 return false;
@@ -356,7 +367,7 @@ static bool initialize_injector_functions(injector_t injector, const char* file,
 
             injector->exec_func = get_function_va(drakvuf, eprocess_base, "kernel32.dll", "VirtualAlloc");
             break;
-#endif*/
+#endif
     };
 
     return injector->exec_func != 0;

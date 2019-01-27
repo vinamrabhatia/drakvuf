@@ -136,10 +136,10 @@ extern bool verbose;
 class drakvuf_c
 {
 private:
-    bool leave_paused;
+    bool leave_paused { false };
     drakvuf_t drakvuf { nullptr };
-    drakvuf_plugins* plugins;
-    injector_t injector_to_be_freed_when_done;
+    drakvuf_plugins* plugins { nullptr };
+    injector_t injector_to_be_freed_when_done { 0 };
 
 public:
     int timeout { 0 };
