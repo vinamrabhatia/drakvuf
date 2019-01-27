@@ -121,9 +121,12 @@ extern bool verbose;
 
 #define ARRAY_SIZE(arr) sizeof((arr)) / sizeof((arr)[0])
 
-#ifdef __clang_analyzer__
-#define vmi_free_unicode_str g_free
-#endif
+#define SW_SHOWNORMAL           1
+#define MEM_COMMIT              0x00001000
+#define MEM_RESERVE             0x00002000
+#define MEM_PHYSICAL            0x00400000
+#define PAGE_EXECUTE_READWRITE  0x40
+#define CREATE_SUSPENDED        0x00000004
 
 enum offset
 {
@@ -131,12 +134,6 @@ enum offset
     KTRAP_FRAME_RIP,
 
     OFFSET_MAX
-};
-
-static const char* offset_names[OFFSET_MAX][2] =
-{
-    [KTHREAD_TRAPFRAME] = {"_KTHREAD", "TrapFrame" },
-    [KTRAP_FRAME_RIP] = {"_KTRAP_FRAME", "Rip" },
 };
 
 struct injector
@@ -163,18 +160,20 @@ struct injector
         };
 
         // For shellcode execution
-        struct {
-            addr_t payload, payload_addr, memset;
+        /*struct {
+            gpointer payload;
+            addr_t payload_addr, memset;
             size_t binary_size, payload_size;
-            uint32_t status;
         };
 
         // For process doppelganging shellcode
         struct {
-            addr_t binary, binary_addr, saved_bp;
-            addr_t process_notify;
-        };
+            gpointer binary;
+            addr_t binary_addr, saved_bp, process_notify;
+        };*/
     };
+
+    uint32_t status;
 
     const char* binary_path;
     const char* target_process;
@@ -182,8 +181,8 @@ struct injector
     addr_t process_info;
     x86_registers_t saved_regs;
 
-    drakvuf_trap_t bp;
-    GSList* memtraps;
+    drakvuf_trap_t cr3_wait_for_target;
+    GSList* traps;
 
     size_t offsets[OFFSET_MAX];
 
@@ -192,5 +191,159 @@ struct injector
     uint32_t pid, tid;
     uint64_t hProc, hThr;
 };
+
+struct startup_info_32
+{
+    uint32_t cb;
+    uint32_t lpReserved;
+    uint32_t lpDesktop;
+    uint32_t lpTitle;
+    uint32_t dwX;
+    uint32_t dwY;
+    uint32_t dwXSize;
+    uint32_t dwYSize;
+    uint32_t dwXCountChars;
+    uint32_t dwYCountChars;
+    uint32_t dwFillAttribute;
+    uint32_t dwFlags;
+    uint16_t wShowWindow;
+    uint16_t cbReserved2;
+    uint32_t lpReserved2;
+    uint32_t hStdInput;
+    uint32_t hStdOutput;
+    uint32_t hStdError;
+};
+
+struct startup_info_64
+{
+    uint32_t cb;
+    addr_t lpReserved;
+    addr_t lpDesktop;
+    addr_t lpTitle;
+    uint32_t dwX;
+    uint32_t dwY;
+    uint32_t dwXSize;
+    uint32_t dwYSize;
+    uint32_t dwXCountChars;
+    uint32_t dwYCountChars;
+    uint32_t dwFillAttribute;
+    uint32_t dwFlags;
+    uint16_t wShowWindow;
+    uint16_t cbReserved2;
+    addr_t lpReserved2;
+    addr_t hStdInput;
+    addr_t hStdOutput;
+    addr_t hStdError;
+};
+
+struct process_information_32
+{
+    uint32_t hProcess;
+    uint32_t hThread;
+    uint32_t dwProcessId;
+    uint32_t dwThreadId;
+} __attribute__ ((packed));
+
+struct process_information_64
+{
+    addr_t hProcess;
+    addr_t hThread;
+    uint32_t dwProcessId;
+    uint32_t dwThreadId;
+} __attribute__ ((packed));
+
+/* Convenience functions */
+static inline unicode_string_t* convert_utf8_to_utf16(char const* str)
+{
+    if (!str) return NULL;
+
+    unicode_string_t us =
+    {
+        .contents = (uint8_t*)g_strdup(str),
+        .length = strlen(str),
+        .encoding = "UTF-8",
+    };
+
+    if (!us.contents) return NULL;
+
+    unicode_string_t* out = (unicode_string_t*)g_malloc0(sizeof(unicode_string_t));
+    if (!out)
+    {
+        g_free(us.contents);
+        return NULL;
+    }
+
+    status_t rc = vmi_convert_str_encoding(&us, out, "UTF-16LE");
+    g_free(us.contents);
+
+    if (VMI_SUCCESS == rc)
+        return out;
+
+    g_free(out);
+    return NULL;
+}
+
+static inline void fill_created_process_info(injector_t injector, drakvuf_trap_info_t* info)
+{
+    access_context_t ctx =
+    {
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+        .addr = injector->process_info,
+    };
+
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(injector->drakvuf);
+
+    if (injector->is32bit)
+    {
+        struct process_information_32 pip = { 0 };
+        if ( VMI_SUCCESS == vmi_read(vmi, &ctx, sizeof(struct process_information_32), &pip, NULL) )
+        {
+            injector->pid = pip.dwProcessId;
+            injector->tid = pip.dwThreadId;
+            injector->hProc = pip.hProcess;
+            injector->hThr = pip.hThread;
+        }
+    }
+    else
+    {
+        struct process_information_64 pip = { 0 };
+        if ( VMI_SUCCESS == vmi_read(vmi, &ctx, sizeof(struct process_information_64), &pip, NULL) )
+        {
+            injector->pid = pip.dwProcessId;
+            injector->tid = pip.dwThreadId;
+            injector->hProc = pip.hProcess;
+            injector->hThr = pip.hThread;
+        }
+    }
+
+    drakvuf_release_vmi(injector->drakvuf);
+}
+
+static inline void free_traps(injector_t injector)
+{
+    GSList * loop = injector->traps;
+
+    while (loop)
+    {
+        drakvuf_remove_trap(injector->drakvuf, loop->data, (drakvuf_trap_free_t)g_free);
+        loop = loop->next;
+    }
+
+    g_slist_free(injector->traps);
+    injector->traps = NULL;
+}
+
+static inline addr_t get_function_va(drakvuf_t drakvuf, addr_t eprocess_base, const char* lib, const char* fun)
+{
+    addr_t addr = drakvuf_exportsym_to_va(drakvuf, eprocess_base, lib, fun);
+    if (!addr)
+        PRINT_DEBUG("Failed to get address of %s!%s\n", lib, fun);
+    return addr;
+}
+
+/* CreateProcess */
+bool init_createprocess(injector_t injector, addr_t eprocess_base);
+event_response_t cr3_createprocess_wait_for_target_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
 #endif

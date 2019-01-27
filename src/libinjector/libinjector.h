@@ -122,8 +122,7 @@ typedef enum
     INJECT_METHOD_SHELLCODE,
     INJECT_METHOD_DOPP,
     __INJECT_METHOD_MAX
-}
-injection_method_t;
+} injection_method_t;
 
 typedef enum
 {
@@ -153,7 +152,6 @@ struct argument
     uint64_t data_on_stack;
     void* data;
 };
-
 
 void init_argument(struct argument* arg,
                    argument_type_t type,
@@ -189,7 +187,8 @@ int injector_start_app(drakvuf_t drakvuf,
                        output_format_t format,
                        const char* binary_path,     // if -m = doppelganging
                        const char* target_process,  // if -m = doppelganging
-                       bool break_loop_on_detection);
+                       bool break_loop_on_detection,
+                       injector_t* injector); // out: only if break_loop_on_detection is set and there are still events left to process
 
 #pragma GCC visibility pop
 

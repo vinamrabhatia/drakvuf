@@ -102,8 +102,9 @@
 #                                                                         #
 #*************************************************************************#
 
-h_sources = libinjector.h private.h
-c_sources = injector.c injector_stack.c
+h_sources  = libinjector.h private.h
+c_sources  = injector.c injector_stack.c
+c_sources += createprocess.c
 
 AM_CFLAGS = -I$(top_srcdir) -I$(top_srcdir)/src -I$(srcdir)
 AM_CFLAGS += $(CFLAGS)
@@ -117,7 +118,7 @@ endif
 # Note that -pg is incompatible with HARDENING
 if DEBUG
 AM_CFLAGS += -DDRAKVUF_DEBUG -Werror -Wall -Wextra -g -ggdb3
-AM_CFLAGS += -Wno-missing-field-initializers -Wno-unused-parameter
+AM_CFLAGS += -Wno-missing-field-initializers -Wno-unused-parameter -Wno-unused-function
 if !HARDENING
 AM_CFLAGS += -pg
 endif

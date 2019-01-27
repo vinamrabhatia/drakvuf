@@ -139,6 +139,7 @@ private:
     bool leave_paused;
     drakvuf_t drakvuf { nullptr };
     drakvuf_plugins* plugins;
+    injector_t injector_to_be_freed_when_done;
 
 public:
     int timeout { 0 };
