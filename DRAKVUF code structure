@@ -1,0 +1,249 @@
+-> Read drakvuf main and other files - 10
+-> Read libiinector and other files - 11pm
+-> Write Stuffs- 12:30 pm should be fine!
+-> About Windows - 30 mins --- so 1am!
+-> Complete bomb lab lectures and finish by next morning 7 am! 
+
+--Satuday will be understanding the internal fucntions and making progress on writing that dummy module thingy!
+--Sunday you can look at last week 2 classes! --completing the dummy module thingy!
+--Monday other classes!! 
+
+//basic drakvuf pages!
+
+Drakvuf main structure has the following information:
+
+    drakvuf_c(const char* domain,
+              const char* rekall_profile,
+              const char* rekall_wow_profile,  //check whats this
+              output_format_t output,
+              bool verbose,
+              bool leave_paused,
+              bool libvmi_conf);
+    }
+
+//Injector command in the drakvuf code?
+drakvuf->inject_cmd
+
+main.cpp :
+Basically just selects all the options!
+
+drakvuf.cpp:
+Declares a class, and implements object function; these are implemented in libdrakvuf.h
+
+Inside libdrakvuf folder:
+
+drakvuf.c: implements major of the class methods of drakvuf.cc outside.
+
+private.h has the main structures
+
+struct drakvuf
+{
+    char* dom_name;
+    domid_t domID;
+    char* rekall_profile;
+    json_object* rekall_profile_json;
+    os_t os;
+    char* rekall_wow_profile;
+    json_object* rekall_wow_profile_json;
+
+    xen_interface_t* xen;
+    os_interface_t osi;
+    uint16_t altp2m_idx, altp2m_idr;
+
+    xen_pfn_t zero_page_gfn;
+
+    // VMI
+    unsigned long flush_counter;
+    GMutex vmi_lock;
+    vmi_instance_t vmi;
+
+    vmi_event_t cr3_event;
+    vmi_event_t interrupt_event;
+    vmi_event_t mem_event;
+    vmi_event_t debug_event;
+    vmi_event_t cpuid_event;
+    vmi_event_t* step_event[16];
+    drakvuf_trap_t guard0;
+
+    size_t* offsets;
+    size_t* sizes;
+
+    size_t* wow_offsets;
+
+    // Processing trap removals in trap callbacks
+    // is problematic so we save all such requests
+    // in a list to be processed after all callbacks
+    // are finished.
+    bool in_callback;
+    GHashTable* remove_traps;
+
+    int interrupted;
+    page_mode_t pm;
+    unsigned int vcpus;
+    uint64_t init_memsize;
+    xen_pfn_t max_gpfn;
+    addr_t kernbase;
+    addr_t kdtb;
+
+    int address_width;
+
+    GHashTable* remapped_gfns; // Key: gfn
+    // val: remapped gfn
+
+    GHashTable* breakpoint_lookup_pa;   // key: PA of trap
+    // val: struct breakpoint
+    GHashTable* breakpoint_lookup_gfn;  // key: gfn (size uint64_t)
+    // val: GSList of addr_t* for trap locations
+    GHashTable* breakpoint_lookup_trap; // key: trap pointer
+    // val: struct breakpoint
+
+    GHashTable* memaccess_lookup_gfn;  // key: gfn of trap
+    // val: struct memaccess
+    GHashTable* memaccess_lookup_trap; // key: trap pointer
+    // val: struct memaccess
+
+    GSList* cr0, *cr3, *cr4, *debug, *cpuid;
+
+    GSList* event_fd_info;     // the list of registered event FDs
+    struct pollfd* event_fds;  // auto-generated pollfd for poll()
+    int event_fd_cnt;          // auto-generated for poll()
+    fd_info_t fd_info_lookup;  // auto-generated for fast drakvuf_loop lookups
+};
+
+struct fd_info
+{
+    int fd;
+    event_cb_t event_cb;
+    void* data;
+};
+
+struct breakpoint
+{
+    addr_t pa;
+    drakvuf_trap_t guard, guard2;
+    bool doubletrap;
+};
+struct memaccess
+{
+    addr_t gfn;
+    bool guard2;
+    vmi_mem_access_t access;
+};
+
+struct wrapper
+{
+    trap_type_t type;
+    drakvuf_t drakvuf;
+    GSList* traps; /* List of DRAKVUF traps registered for this event */
+    union
+    {
+        struct memaccess memaccess;
+        struct breakpoint breakpoint;
+    };
+};
+
+struct free_trap_wrapper
+{
+    unsigned int counter;
+    drakvuf_trap_t* trap;
+    drakvuf_trap_free_t free_routine;
+};
+
+struct remapped_gfn
+{
+    xen_pfn_t o;
+    xen_pfn_t r;
+    bool active;
+};
+
+typedef struct process_data_priv
+{
+    char* name;   /* Process name */
+    vmi_pid_t pid ;     /* Process pid */
+    vmi_pid_t ppid ;    /* Process parent pid */
+    addr_t base_addr ;  /* Process base address */
+    int64_t userid ;    /* Process SessionID/UID */
+} proc_data_priv_t ;
+
+struct memcb_pass
+{
+    drakvuf_t drakvuf;
+    uint64_t gfn;
+    addr_t pa;
+    proc_data_priv_t proc_data ;
+    struct remapped_gfn* remapped_gfn;
+    vmi_mem_access_t access;
+    GSList* traps;
+};
+
+//Lots of structures to look for!
+
+
+//GSList is integer values or pointers to data.
+
+inject_traps
+event_response
+
+os.c : defines private.h and takes in the fucnctions common for both windows and linux.
+has os_interface_t which declares function pointers.
+
+linux.c : Takes os.c, declares all the os functions specific to linus, also includes other linux files(linux-offsets-map.h and linux-offsets)
+
+rekall-profiles.c : Looks up at the rekall profiles json and gives us back the os, symbols details! 
+
+vmi.c : Mainly interacts with LIBVMI, used for inserting traps and managing control events.
+
+win.c : handles all the win os based functions, uses win-offset-maps, win-wow-offset maps.
+win-processes.c: handles all the windows process related functions and includes all the above files.
+
+Other helper windows files:
+win-files: get-filename-from-handle
+win-exports: search for the given module+symbol in the given module list
+win-error-codes: //
+win-handles: 
+win-registry: 
+win-symbols: looks up in rekall for the symbols.
+
+
+------------
+
+injector.c outside takes all the options
+
+Inside libinjector folder:
+
+libinjector_stack.c has helper functions:
+setup_stack is the function which uses all the other functions of the library. 
+which calls setup_stack_64/32: It puts all the arguments on the stack, saves the return address, grows the stack in size and writes this into the memory of the guest with the help of libVMI, 
+
+libinjector.c : major functions:
+
+has important structures:
+
+struct injector:
+for inputs, internals, creating process, shellcode execution, results;
+
+structures for starting 32-bit-window, 64-bit-window, 32 bit process info, 64 bit process info;
+
+setup_create_process_stack calls the libinjector_stack functions and other functions like setup_resume_thread_stack, setup_shell_execute_stack etc.
+
+Steps involved in Injector:
+1. Find the process in the OS with the process ID.
+2. Get the offsets from the Rekall profile
+3. If the injection method is createproc:
+4. Check the current process if it contains the library and the loaded function: 'ResumeThread'/'CreateProcessW'
+5. Add a trap to the process for CR3 register. (wait_for_target_process_cb) and (wait_for_crash_of_target_proces)
+	//Following the path of execution for 64 bit.
+	//The wait_for_target_process_cb traps CR3 register events, and the process id and/or thread-id matches, 
+	//This process is in kernel-mode, so the trap is set as soon as it reaches user mode. 
+	//For 64 bit, setup_int3_trap is called which sets a trap with the callback fucntion set as injector_int3_cb.
+	//(!injector->is32bit && !injector->hijacked && injector->status == STATUS_NULL) //registers are copied and 
+6. DRAKVUF loops till it interruped, after which it frees the memory!
+
+Syscalls require the context of user space program. 
+
+
+
+
+
+
+
