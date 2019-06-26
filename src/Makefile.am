@@ -165,3 +165,4 @@ injector_LDADD += libinjector/libinjector.la
 xen_memclone_LDADD = xen_helper/libxenhelper.la
 
 libkernel-injector_LDADD = libkernel-injector/libkernel-injector.la
+libkernel-injector_LDADD += libdrakvuf/libdrakvuf.la

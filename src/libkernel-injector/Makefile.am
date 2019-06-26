@@ -32,3 +32,4 @@ noinst_LTLIBRARIES= libkernel-injector.la
 libkernel-injector_la_SOURCES= $(h_sources) $(c_sources)
 libkernel-injector_la_LIBADD= ../xen_helper/libxenhelper.la
 libkernel-injector_la_LIBADD+= ../libdrakvuf/libdrakvuf.la
+libkernel-injector_la_LIBADD+= ../libinjector/libinjector.la
