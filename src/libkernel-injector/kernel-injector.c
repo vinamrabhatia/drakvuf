@@ -8,7 +8,7 @@
 #include <assert.h>
 
 #include "kernel-injector.h"
-#include "../plugins/syscalls/winscproto.h"
+#include "winscproto.h"
 
 static char* extract_string(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const arg_t& arg, addr_t val)
 {
