@@ -21,6 +21,14 @@ extern bool verbose;
 #define vmi_free_unicode_str g_free
 #endif
 
+static const char* userid[] =
+{
+    [VMI_OS_WINDOWS] = "SessionID",
+    [VMI_OS_LINUX] = "UID"
+};
+
+#define USERIDSTR(drakvuf) (userid[drakvuf_get_os_type(drakvuf)])
+
 enum offset
 {
     KTHREAD_TRAPFRAME,
@@ -35,4 +43,4 @@ static const char* offset_names[OFFSET_MAX][2] =
     [KTRAP_FRAME_RIP] = {"_KTRAP_FRAME", "Rip" },
 };
 
-#endif  /KERNEL_LIBINJECTOR_PRIVATE_H
+#endif  //KERNEL_LIBINJECTOR_PRIVATE_H

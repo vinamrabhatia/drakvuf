@@ -21,10 +21,8 @@ public:
     output_format_t format;
     os_t os;
 
-    syscalls(drakvuf_t drakvuf, const syscalls_config* config, output_format_t output);
+    syscalls(drakvuf_t drakvuf, output_format_t output);
     ~syscalls();
 };
 
 #endif //KERNEL_LIBINJECTOR_H
-
-/

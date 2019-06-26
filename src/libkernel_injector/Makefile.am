@@ -1,5 +1,5 @@
-h_sources = kernel-injector.h private.h commonscproto.h winscproto.h
-c_sources = kernel-injector.c injector_stack.c
+h_sources = kernel_injector.h private.h winscproto.h commonscproto.h
+c_sources = kernel_injector.cpp 
 
 AM_CPPFLAGS = -I$(top_srcdir) -I$(top_srcdir)/src -I$(srcdir)
 AM_CPPFLAGS += $(VMI_CFLAGS)
@@ -28,8 +28,7 @@ AM_CFLAGS += -pg
 endif
 endif
 
-noinst_LTLIBRARIES= libkernel-injector.la
-libkernel-injector_la_SOURCES= $(h_sources) $(c_sources)
-libkernel-injector_la_LIBADD= ../xen_helper/libxenhelper.la
-libkernel-injector_la_LIBADD+= ../libdrakvuf/libdrakvuf.la
-libkernel-injector_la_LIBADD+= ../libinjector/libinjector.la
+noinst_LTLIBRARIES= libkernelinjector.la
+libkernelinjector_la_SOURCES= $(h_sources) $(c_sources)
+libkernelinjector_la_LIBADD= ../xen_helper/libxenhelper.la
+libkernelinjector_la_LIBADD+= ../libdrakvuf/libdrakvuf.la

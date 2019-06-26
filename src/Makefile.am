@@ -102,14 +102,14 @@
 #                                                                         #
 #*************************************************************************#
 
-bin_PROGRAMS = drakvuf xen_memclone injector kernel-injector
+bin_PROGRAMS = drakvuf xen_memclone injector kernel_injector
 
-SUBDIRS = xen_helper libdrakvuf libinjector plugins dirwatch libkernel-injector
+SUBDIRS = xen_helper libdrakvuf libinjector plugins dirwatch libkernel_injector
 
 drakvuf_SOURCES = main.cpp drakvuf.cpp
 xen_memclone_SOURCES  = xen_memclone.c
 injector_SOURCES = injector.c
-kernel-injector_SOURCES = kernel-injector.c
+kernel_injector_SOURCES = kernel_injector.cpp
 
 
 AM_CPPFLAGS = $(CPPFLAGS)
@@ -153,7 +153,7 @@ drakvuf_LDADD = libdrakvuf/libdrakvuf.la
 drakvuf_LDADD += xen_helper/libxenhelper.la
 drakvuf_LDADD += plugins/libdrakvufplugins.la
 drakvuf_LDADD += libinjector/libinjector.la
-drakvuf_LDADD += libkernel-injector/libkernel-injector.la
+drakvuf_LDADD += libkernel_injector/libkernelinjector.la
 
 if HARDENING
 drakvuf_LDADD += $(HARDEN_LDFLAGS)
@@ -164,5 +164,5 @@ injector_LDADD += libinjector/libinjector.la
 
 xen_memclone_LDADD = xen_helper/libxenhelper.la
 
-libkernel-injector_LDADD = libkernel-injector/libkernel-injector.la
-libkernel-injector_LDADD += libdrakvuf/libdrakvuf.la
+kernel_injector_LDADD = libkernel_injector/libkernelinjector.la
+kernel_injector_LDADD += libdrakvuf/libdrakvuf.la

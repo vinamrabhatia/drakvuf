@@ -7,7 +7,7 @@
 #include <libvmi/libvmi.h>
 #include <assert.h>
 
-#include "kernel-injector.h"
+#include "kernel_injector.h"
 #include "winscproto.h"
 
 static char* extract_string(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const arg_t& arg, addr_t val)
@@ -44,6 +44,7 @@ static char* extract_string(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const 
 
 static void print_header(output_format_t format, drakvuf_t drakvuf, const drakvuf_trap_info_t* info)
 {
+    PRINT_DEBUG("%u\n", format);
     printf("[SYSCALL] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64" %s!%s",
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
                    USERIDSTR(drakvuf), info->proc_data.userid,
@@ -52,12 +53,14 @@ static void print_header(output_format_t format, drakvuf_t drakvuf, const drakvu
 
 static void print_nargs(output_format_t format, uint32_t nargs)
 {
+    PRINT_DEBUG("%u\n", format);
     printf(" Arguments: %" PRIu32 "\n", nargs);
 }
 
 
 static void print_default_arg(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const arg_t& arg, addr_t val, const char* str)
 {
+    printf("\t %p %p" ,&drakvuf, info);
     printf("\t%s %s %s: ", arg_direction_names[arg.dir], type_names[arg.type], arg.name);
 
     if ( 4 == s->reg_size )
@@ -98,6 +101,7 @@ static void print_args(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* info
 
 static void print_footer(output_format_t format, uint32_t nargs)
 {
+        PRINT_DEBUG("%u\n", format);
 	if ( nargs == 0)
 		printf("\n");
 }
@@ -326,11 +330,11 @@ int kernel_injector_start(
     output_format_t format)
 {
     int rc = 0;
-    PRINT_DEBUG("Target PID %u to start '%s'\n", pid, file);
+    //PRINT_DEBUG("Target PID %u to start '%s'\n", pid, file);
 
     //Setting up the breakpoints at the common syscalls. 
-    syscalls sc = new syscalls(drakvuf, format);
-
+    syscalls* sc = new syscalls(drakvuf, format);
+    PRINT_DEBUG("%d\n",sc->reg_size);
 
     return rc;
 }

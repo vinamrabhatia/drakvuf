@@ -7,7 +7,7 @@
 #include <libvmi/libvmi.h>
 
 #include <libdrakvuf/libdrakvuf.h>
-#include <libkernel-injector/kernel-injector.h>
+#include <libkernel_injector/kernel_injector.cpp>
 
 static drakvuf_t drakvuf;
 
