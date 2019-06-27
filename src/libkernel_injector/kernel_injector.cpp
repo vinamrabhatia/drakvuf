@@ -112,7 +112,7 @@ static event_response_t win_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     unsigned int nargs = 0;
     size_t size = 0;
     void* buf = NULL; // pointer to buffer to hold argument values
-
+    
     syscall_wrapper_t* wrapper = (syscall_wrapper_t*)info->trap->data;
     syscalls* s = wrapper->sc;
     const syscall_t* sc = NULL;
@@ -236,7 +236,7 @@ static GSList* create_trap_config(drakvuf_t drakvuf, syscalls* s, symbols_t* sym
             trap->name = g_strdup(symbol->name);
             trap->type = BREAKPOINT;
             trap->cb = win_cb;
-            trap->data = wrapper;
+            trap->data = wrapper;          
 
             ret = g_slist_prepend(ret, trap);
         }
@@ -304,6 +304,7 @@ syscalls::syscalls(drakvuf_t drakvuf , output_format_t output)
 
         throw -1;
     }
+
 }
 
 syscalls::~syscalls()
@@ -335,6 +336,9 @@ int kernel_injector_start(
     //Setting up the breakpoints at the common syscalls. 
     syscalls* sc = new syscalls(drakvuf, format);
     PRINT_DEBUG("%d\n",sc->reg_size);
+
+    /* Start the event listener */
+    drakvuf_loop(drakvuf);
 
     return rc;
 }

@@ -10,6 +10,12 @@
 
 #include "private.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#pragma GCC visibility push(default)
+
 class syscalls
 {
 
@@ -24,5 +30,18 @@ public:
     syscalls(drakvuf_t drakvuf, output_format_t output);
     ~syscalls();
 };
+
+
+int kernel_injector_start(
+    drakvuf_t drakvuf,
+    output_format_t format);
+//TODO: Add arguments and the function you want to call. 
+
+
+#pragma GCC visibility pop
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif //KERNEL_LIBINJECTOR_H
