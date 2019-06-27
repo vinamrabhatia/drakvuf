@@ -1,5 +1,4 @@
-//First, we make the traps to happen via Syscalls Plugin.
-//Later we checkout the injector
+
 
 #include <config.h>
 #include <glib.h>
@@ -8,7 +7,7 @@
 #include <assert.h>
 
 #include "kernel_injector.h"
-#include "winscproto.h"
+#include "../plugins/syscalls/winscproto.h"
 
 static char* extract_string(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const arg_t& arg, addr_t val)
 {
@@ -99,23 +98,24 @@ static void print_args(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* info
     }
 }
 
-static void print_footer(output_format_t format, uint32_t nargs)
-{
-        PRINT_DEBUG("%u\n", format);
-	if ( nargs == 0)
-		printf("\n");
-}
-
 
 static event_response_t win_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     unsigned int nargs = 0;
     size_t size = 0;
     void* buf = NULL; // pointer to buffer to hold argument values
-    
+
     syscall_wrapper_t* wrapper = (syscall_wrapper_t*)info->trap->data;
     syscalls* s = wrapper->sc;
     const syscall_t* sc = NULL;
+    PRINT_DEBUG("%p\n", wrapper->function_symbol->name);
+    PRINT_DEBUG("%d\n", wrapper->syscall_index);
+    PRINT_DEBUG("%p\n", wrapper->function_symbol);
+    PRINT_DEBUG("%s\n", wrapper->function_symbol->name);
+    PRINT_DEBUG("%lu\n", wrapper->function_symbol->rva);
+
+    addr_t ntoskrnl = drakvuf_get_kernel_base(drakvuf);
+    addr_t pa = ntoskrnl + wrapper->function_symbol->rva;
 
     if (wrapper->syscall_index>-1 )
     {
@@ -126,11 +126,20 @@ static event_response_t win_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         buf = (unsigned char*)g_malloc(sizeof(char)*size);
     }
 
+
+    ////Making the RIP point to the address in the kernel function
+    //TODO: Take arguments in the command line input and set them up onto stack!
+    PRINT_DEBUG("%lu\n", pa);
+    info->regs->rip = pa;
+    return VMI_EVENT_RESPONSE_SET_REGISTERS;
+
+
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
 
     access_context_t ctx;
     ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
     ctx.dtb = info->regs->cr3;
+    ctx.addr = pa;
 
     if ( nargs )
     {
@@ -176,7 +185,6 @@ static event_response_t win_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         print_nargs(s->format, nargs);
         print_args(s, drakvuf, info, sc, buf);
     }
-    print_footer(s->format, nargs);
 
 exit:
     g_free(buf);
@@ -193,6 +201,7 @@ static GSList* create_trap_config(drakvuf_t drakvuf, syscalls* s, symbols_t* sym
     unsigned long j;
 
     PRINT_DEBUG("Received %lu symbols\n", symbols->count);
+    struct symbol* function_symbol = (struct symbol*)g_malloc(sizeof(struct symbol));
 
     if ( s->os == VMI_OS_WINDOWS )
     {
@@ -203,7 +212,14 @@ static GSList* create_trap_config(drakvuf_t drakvuf, syscalls* s, symbols_t* sym
 
         for (i=0; i < symbols->count; i++)
         {
-            const struct symbol* symbol = &symbols->symbols[i];
+            struct symbol* symbol = &symbols->symbols[i];
+
+            //For now, taking a fixed function!!
+            if(!strncmp(symbol->name, "KeBugCheck\0", 11)){
+                PRINT_DEBUG("%s\n", symbol->name);
+                memcpy(function_symbol, symbol, sizeof(struct symbol));
+                continue;
+            }
 
             if (strncmp(symbol->name, "Nt", 2))
                 continue;
@@ -214,6 +230,7 @@ static GSList* create_trap_config(drakvuf_t drakvuf, syscalls* s, symbols_t* sym
 
             wrapper->syscall_index = -1;
             wrapper->sc=s;
+            wrapper->function_symbol=function_symbol;
 
             for (j=0; j<NUM_SYSCALLS_WIN; j++)
             {
@@ -239,6 +256,10 @@ static GSList* create_trap_config(drakvuf_t drakvuf, syscalls* s, symbols_t* sym
             trap->data = wrapper;          
 
             ret = g_slist_prepend(ret, trap);
+            //PRINT_DEBUG("NAME: %s\n", wrapper->function_symbol->name);
+            //PRINT_DEBUG("%p\n", wrapper->function_symbol);
+            //PRINT_DEBUG("%p\n", wrapper->function_symbol->name);
+            //PRINT_DEBUG("%lu\n", wrapper->function_symbol->rva);
         }
     }
 
@@ -249,6 +270,7 @@ static GSList* create_trap_config(drakvuf_t drakvuf, syscalls* s, symbols_t* sym
 syscalls::syscalls(drakvuf_t drakvuf , output_format_t output)
 {
     symbols_t* symbols = drakvuf_get_symbols_from_rekall(drakvuf);
+
     if (!symbols)
     {
         fprintf(stderr, "Failed to get symbols from Rekall profile\n");
