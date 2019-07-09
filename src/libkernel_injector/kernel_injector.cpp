@@ -17,7 +17,6 @@ struct kernel_injector
     // Internal:
     drakvuf_t drakvuf;
     bool is32bit, hijacked, resumed, detected;
-    injection_method_t method;
     bool global_search;
     addr_t exec_func;
     reg_t target_rsp;
@@ -39,7 +38,6 @@ struct kernel_injector
 
     // Results:
     int rc;
-    inject_result_t result;
     struct
     {
         bool valid;
@@ -147,7 +145,7 @@ static event_response_t win_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     size_t size = 0;
     void* buf = NULL; // pointer to buffer to hold argument values
 
-    kernel_injector_t injector = info->trap->data;
+    kernel_injector_t kernel_injector = (kernel_injector_t) info->trap->data;
     syscalls* s = kernel_injector->sc;
     const syscall_t* sc = NULL;
     PRINT_DEBUG("%p\n", kernel_injector->function_symbol->name);
@@ -397,9 +395,7 @@ int kernel_injector_start(
 
     //Initialising Injector Function
     kernel_injector->drakvuf = drakvuf;
-    kernel_injector->status = STATUS_NULL;
     kernel_injector->is32bit = (drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E);
-    kernel_injector->break_loop_on_detection = break_loop_on_detection;
     kernel_injector->error_code.valid = false;
     kernel_injector->error_code.code = -1;
     kernel_injector->error_code.string = "<UNKNOWN>";
