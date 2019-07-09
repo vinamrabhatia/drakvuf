@@ -9,6 +9,48 @@
 #include "kernel_injector.h"
 #include "../plugins/syscalls/winscproto.h"
 
+struct kernel_injector
+{
+    // Inputs:
+    bool break_loop_on_detection;
+
+    // Internal:
+    drakvuf_t drakvuf;
+    bool is32bit, hijacked, resumed, detected;
+    injection_method_t method;
+    bool global_search;
+    addr_t exec_func;
+    reg_t target_rsp;
+
+    // For create process
+    addr_t resume_thread;
+
+    // Syscalls related
+    syscalls*        sc;
+    int              syscall_index;
+    uint32_t         flags;
+    struct symbol*   function_symbol;
+
+    addr_t process_info;
+    x86_registers_t saved_regs;
+
+    drakvuf_trap_t bp;
+    GSList* memtraps;
+
+    // Results:
+    int rc;
+    inject_result_t result;
+    struct
+    {
+        bool valid;
+        uint32_t code;
+        const char* string;
+    } error_code;
+
+    uint32_t pid, tid;
+    uint64_t hProc, hThr;
+};
+
 static char* extract_string(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const arg_t& arg, addr_t val)
 {
     if ( arg.dir == DIR_IN || arg.dir == DIR_INOUT )
@@ -105,34 +147,31 @@ static event_response_t win_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     size_t size = 0;
     void* buf = NULL; // pointer to buffer to hold argument values
 
-    syscall_wrapper_t* wrapper = (syscall_wrapper_t*)info->trap->data;
-    syscalls* s = wrapper->sc;
+    kernel_injector_t injector = info->trap->data;
+    syscalls* s = kernel_injector->sc;
     const syscall_t* sc = NULL;
-    PRINT_DEBUG("%p\n", wrapper->function_symbol->name);
-    PRINT_DEBUG("%d\n", wrapper->syscall_index);
-    PRINT_DEBUG("%p\n", wrapper->function_symbol);
-    PRINT_DEBUG("%s\n", wrapper->function_symbol->name);
-    PRINT_DEBUG("%lu\n", wrapper->function_symbol->rva);
+    PRINT_DEBUG("%p\n", kernel_injector->function_symbol->name);
+    PRINT_DEBUG("%d\n", kernel_injector->syscall_index);
+    PRINT_DEBUG("%s\n", kernel_injector->function_symbol->name);
+    PRINT_DEBUG("%lu\n", kernel_injector->function_symbol->rva);
 
     addr_t ntoskrnl = drakvuf_get_kernel_base(drakvuf);
-    addr_t pa = ntoskrnl + wrapper->function_symbol->rva;
+    addr_t pa = ntoskrnl + kernel_injector->function_symbol->rva;
 
-    if (wrapper->syscall_index>-1 )
+    if (kernel_injector->syscall_index>-1 )
     {
         // need to malloc buf before setting type of each array cell
-        sc = &win_syscalls[wrapper->syscall_index];
+        sc = &win_syscalls[kernel_injector->syscall_index];
         nargs = sc->num_args;
         size = s->reg_size * nargs;
         buf = (unsigned char*)g_malloc(sizeof(char)*size);
     }
 
-
-    ////Making the RIP point to the address in the kernel function
-    //TODO: Take arguments in the command line input and set them up onto stack!
+    //The code works fine with calling a function without any arguments
+    //Now trying to call a function with the arguments; calling CreateProcessA!
     PRINT_DEBUG("%lu\n", pa);
     info->regs->rip = pa;
     return VMI_EVENT_RESPONSE_SET_REGISTERS;
-
 
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
 
@@ -193,7 +232,7 @@ exit:
 }
 
 
-static GSList* create_trap_config(drakvuf_t drakvuf, syscalls* s, symbols_t* symbols)
+static GSList* create_trap_config(drakvuf_t drakvuf, syscalls* s, symbols_t* symbols, kernel_injector_t kernel_injector)
 {
 
     GSList* ret = NULL;
@@ -226,22 +265,22 @@ static GSList* create_trap_config(drakvuf_t drakvuf, syscalls* s, symbols_t* sym
 
             PRINT_DEBUG("[SYSCALLS] Adding trap to %s\n", symbol->name);
 
-            syscall_wrapper_t* wrapper = (syscall_wrapper_t*)g_malloc(sizeof(syscall_wrapper_t));
+            //syscall_wrapper_t* wrapper = (syscall_wrapper_t*)g_malloc(sizeof(syscall_wrapper_t));
 
-            wrapper->syscall_index = -1;
-            wrapper->sc=s;
-            wrapper->function_symbol=function_symbol;
+            kernel_injector->syscall_index = -1;
+            kernel_injector->sc=s;
+            kernel_injector->function_symbol=function_symbol;
 
             for (j=0; j<NUM_SYSCALLS_WIN; j++)
             {
                 if ( !strcmp(symbol->name,win_syscalls[j].name) )
                 {
-                    wrapper->syscall_index=j;
+                    kernel_injector->syscall_index=j;
                     break;
                 }
             }
 
-            if ( wrapper->syscall_index==-1 )
+            if ( kernel_injector->syscall_index==-1 )
                 PRINT_DEBUG("[SYSCALLS]: %s not found in argument list\n", symbol->name);
 
             drakvuf_trap_t* trap = (drakvuf_trap_t*)g_malloc0(sizeof(drakvuf_trap_t));
@@ -253,7 +292,7 @@ static GSList* create_trap_config(drakvuf_t drakvuf, syscalls* s, symbols_t* sym
             trap->name = g_strdup(symbol->name);
             trap->type = BREAKPOINT;
             trap->cb = win_cb;
-            trap->data = wrapper;          
+            trap->data = kernel_injector;          
 
             ret = g_slist_prepend(ret, trap);
             //PRINT_DEBUG("NAME: %s\n", wrapper->function_symbol->name);
@@ -267,7 +306,7 @@ static GSList* create_trap_config(drakvuf_t drakvuf, syscalls* s, symbols_t* sym
 }
 
 
-syscalls::syscalls(drakvuf_t drakvuf , output_format_t output)
+syscalls::syscalls(drakvuf_t drakvuf , output_format_t output, kernel_injector_t kernel_injector)
 {
     symbols_t* symbols = drakvuf_get_symbols_from_rekall(drakvuf);
 
@@ -278,7 +317,7 @@ syscalls::syscalls(drakvuf_t drakvuf , output_format_t output)
     }
 
     this->os = drakvuf_get_os_type(drakvuf);
-    this->traps = create_trap_config(drakvuf, this, symbols);
+    this->traps = create_trap_config(drakvuf, this, symbols, kernel_injector);
     this->format = output;
 
     if ( !this->traps )
@@ -354,13 +393,24 @@ int kernel_injector_start(
 {
     int rc = 0;
     //PRINT_DEBUG("Target PID %u to start '%s'\n", pid, file);
+    kernel_injector_t kernel_injector = (kernel_injector_t)g_malloc0(sizeof(struct kernel_injector));
+
+    //Initialising Injector Function
+    kernel_injector->drakvuf = drakvuf;
+    kernel_injector->status = STATUS_NULL;
+    kernel_injector->is32bit = (drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E);
+    kernel_injector->break_loop_on_detection = break_loop_on_detection;
+    kernel_injector->error_code.valid = false;
+    kernel_injector->error_code.code = -1;
+    kernel_injector->error_code.string = "<UNKNOWN>";
 
     //Setting up the breakpoints at the common syscalls. 
-    syscalls* sc = new syscalls(drakvuf, format);
-    PRINT_DEBUG("%d\n",sc->reg_size);
+    syscalls* sc = new syscalls(drakvuf, format, kernel_injector);
 
     /* Start the event listener */
     drakvuf_loop(drakvuf);
+
+    // //TODO: free injector as well
 
     return rc;
 }

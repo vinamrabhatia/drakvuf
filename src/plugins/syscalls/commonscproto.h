@@ -442,10 +442,9 @@ typedef struct
 
 typedef struct
 {
-    syscalls*             sc;
-    int                   syscall_index;
-    uint32_t              flags;
-    struct symbol*  function_symbol;
+    syscalls*        sc;
+    int              syscall_index;
+    uint32_t         flags;
 } syscall_wrapper_t;
 
 

@@ -16,6 +16,8 @@ extern "C" {
 
 #pragma GCC visibility push(default)
 
+typedef struct kernel_injector* kernel_injector_t;
+
 class syscalls
 {
 
@@ -27,10 +29,9 @@ public:
     output_format_t format;
     os_t os;
 
-    syscalls(drakvuf_t drakvuf, output_format_t output);
+    syscalls(drakvuf_t drakvuf, output_format_t output, kernel_injector_t kernel_injector);
     ~syscalls();
 };
-
 
 int kernel_injector_start(
     drakvuf_t drakvuf,

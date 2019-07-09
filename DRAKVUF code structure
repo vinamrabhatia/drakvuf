@@ -217,6 +217,7 @@ structures for starting 32-bit-window, 64-bit-window, 32 bit process info, 64 bi
 setup_create_process_stack calls the libinjector_stack functions and other functions like setup_resume_thread_stack, setup_shell_execute_stack etc.
 
 Steps involved in Injector:
+
 1. Find the process in the OS with the process ID.
 2. Get the offsets from the Rekall profile
 3. If the injection method is createproc:
@@ -231,9 +232,85 @@ Steps involved in Injector:
 
 Syscalls require the context of user space program. 
 
+//Only focusing on CreateProcessA for 64 bit first!
+
+1. Initialise Injector
 
 
+2. injector->exec_func = get_function_va(drakvuf, eprocess_base, "kernel32.dll", "CreateProcessW", injector->global_search);
+
+Get the virtual address of the function that we wish to call!
+-----Now, do we have to search for this function in the symbols or do we try to find it loaded in a process?
+-----Search if this function is even present in the symbols?! --So getting the address is this way: get_function_va
+[[[-----When you search for your function, you search for it in the module as well as in the symbols----- ]]]
 
 
+//Understand access_context as well. 
+
+typedef struct {
+    translation_mechanism_t translate_mechanism;
+
+    addr_t addr;      /**< specify iff using VMI_TM_NONE, VMI_TM_PROCESS_DTB or VMI_TM_PROCESS_PID */
+    const char ksym; /*< specify iff using VMI_TM_KERNEL_SYMBOL */
+    addr_t dtb;       /**< specify iff using VMI_TM_PROCESS_DTB */
+    vmi_pid_t pid;    /**< specify iff using VMI_TM_PROCESS_PID */
+} access_context_t;
+
+typedef enum translation_mechanism {
+    VMI_TM_INVALID,         /**< Invalid translation mechanism */
+    VMI_TM_NONE,            /**< No translation is required, address is physical address */
+    VMI_TM_PROCESS_DTB,     /**< Translate addr via specified directory table base. */
+    VMI_TM_PROCESS_PID,     /**< Translate addr by finding process first to use its DTB. */
+    VMI_TM_KERNEL_SYMBOL    /**< Find virtual address of kernel symbol and translate it via kernel DTB. */
+} translation_mechanism_t;
 
 
+If function is not present in this module, check other modules loaded in the process.
+//Check if you want more details of searching into modules!
+
+3. Callback functions are wait_for_target_process_cb and wait_for_crash_of_target_process(just report ) //We are waiting for it to switch to the uprocess where we want to inject, we dont need to do this.
+//We already have our callback function setup. 
+
+//Here, injector waits for the process to reach user-mode since CreateProcessA is a user-level function. We dont need to do that
+//  * For 64-bit Windows we use the trapframe approach, where we read. * the saved RIP from the stack trap frame and breakpoint it. 
+//  By reading the saved RIP and trapping there, we wait for the process to reach the user-mode, we move step-wise and break out trap there. 
+//  Trapframe stores register set which was saved during exception have arised, so using trapframe we can return back and proceed execution (when exception or irq will be handled)
+
+So, in wait_for_process_cb, we go to setup_int3_trap where we go to callback function injector_int3_cb. 
+
+This callback function performs various checks and proceeds when we hit the RIP from the trapframe.
+
+-> Save all your registers here and call [setup_create_process_stack(injector, info); injector->target_rsp = info->regs->rsp;]
+
+-> setup_create_process_stack: 
+
+//We have arguments of the types on stack.
+struct argument
+{
+    uint32_t type;
+    uint32_t size;
+    uint64_t data_on_stack;
+    void* data;
+};
+
+You have to initialise int argument, unicode argument and structure arguments(take care to do this! and give startup information and process information!
+----Do we have to give startup information and process information for the kernel functions too? (--CHECK--)
+----Check why we have to use the following function: [convert_utf8_to_utf16 (--CHECK--)]
+
+From here, we call the setup_stack function; get the windows architecture and go to setup_stack_64. 
+----We have noted down rsp's address.  
+Take care of alignment in case of string and struct arguments.  Make stack 16 byte aligned too. 
+Copy the first 4 arguments into registers and others into memory, allocate homing space, ---save the return address on stack--- and grow the stack. 
+injector->target_rsp = info->regs->rsp;!
+info->regs->rip = injector->exec_func;
+
+-> After calling the function and setting up the stack; [hijack the process and injector->status = STATUS_CREATE_OK;] Drakvuf loop keeps on running. 
+
+-> The second part is being done for return values majorly! When we have the return, we have the same breakpoint since the return address was the same value. 
+
+// injector->rc = info->regs->rax;
+
+So to set up the stack, we need the following information:
+
+-> Save all your registers here and call [setup_create_process_stack(injector, info); injector->target_rsp = info->regs->rsp;]
+-> setup_create_process_stack: 
