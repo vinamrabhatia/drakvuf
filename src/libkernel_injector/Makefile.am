@@ -1,5 +1,5 @@
 h_sources = kernel_injector.h private.h ../plugins/syscalls/winscproto.h ../plugins/syscalls/commonscproto.h
-c_sources = kernel_injector.cpp 
+c_sources = kernel_injector.cpp injector_stack.cpp
 
 AM_CPPFLAGS = -I$(top_srcdir) -I$(top_srcdir)/src -I$(srcdir)
 AM_CPPFLAGS += $(VMI_CFLAGS)

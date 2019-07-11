@@ -23,6 +23,7 @@ struct kernel_injector
 
     // For create process
     addr_t resume_thread;
+    uint32_t status;
 
     // Syscalls related
     syscalls*        sc;
@@ -138,9 +139,25 @@ static void print_args(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* info
     }
 }
 
+static bool setup_create_process_stack(kernel_injector_t kernel_injector, drakvuf_trap_info_t* info, unsigned int nargs)
+{
+    struct argument args[20] = { {0} };
+    printf("%d\n", nargs);
+
+    // CreateProcess(NULL, TARGETPROC, NULL, NULL, 0, 0, NULL, NULL, &si, pi))
+    init_int_argument(&args[0], 0);
+    init_int_argument(&args[1], 0);
+    init_int_argument(&args[2], 0);
+    init_int_argument(&args[3], 0);
+    init_int_argument(&args[4], 0);
+
+    bool success = setup_stack(kernel_injector->drakvuf, info, args, ARRAY_SIZE(args));
+    return success;
+}
 
 static event_response_t win_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
+    bool success = false;
     unsigned int nargs = 0;
     size_t size = 0;
     void* buf = NULL; // pointer to buffer to hold argument values
@@ -152,6 +169,7 @@ static event_response_t win_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     PRINT_DEBUG("%d\n", kernel_injector->syscall_index);
     PRINT_DEBUG("%s\n", kernel_injector->function_symbol->name);
     PRINT_DEBUG("%lu\n", kernel_injector->function_symbol->rva);
+    memcpy(&kernel_injector->saved_regs, info->regs, sizeof(x86_registers_t));
 
     addr_t ntoskrnl = drakvuf_get_kernel_base(drakvuf);
     addr_t pa = ntoskrnl + kernel_injector->function_symbol->rva;
@@ -164,14 +182,25 @@ static event_response_t win_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         size = s->reg_size * nargs;
         buf = (unsigned char*)g_malloc(sizeof(char)*size);
     }
+    nargs=5;
 
     //The code works fine with calling a function without any arguments
     //Now trying to call a function with the arguments; calling CreateProcessA!
+    success = setup_create_process_stack(kernel_injector, info, nargs);
+    kernel_injector->target_rsp = info->regs->rsp;
+    if (!success)
+    {
+        PRINT_DEBUG("Failed to setup stack for passing inputs!\n");
+        return 0;
+    }
+
+    kernel_injector->status = STATUS_CREATE_OK;
+
     PRINT_DEBUG("%lu\n", pa);
     info->regs->rip = pa;
     return VMI_EVENT_RESPONSE_SET_REGISTERS;
 
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(kernel_injector->drakvuf);
 
     access_context_t ctx;
     ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
@@ -402,6 +431,7 @@ int kernel_injector_start(
 
     //Setting up the breakpoints at the common syscalls. 
     syscalls* sc = new syscalls(drakvuf, format, kernel_injector);
+    PRINT_DEBUG("%d\n",sc->reg_size);
 
     /* Start the event listener */
     drakvuf_loop(drakvuf);
