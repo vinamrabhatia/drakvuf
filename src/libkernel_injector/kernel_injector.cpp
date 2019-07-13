@@ -24,6 +24,7 @@ struct kernel_injector
     // For create process
     addr_t resume_thread;
     uint32_t status;
+    addr_t trap_pa;
 
     // Syscalls related
     syscalls*        sc;
@@ -145,11 +146,12 @@ static bool setup_create_process_stack(kernel_injector_t kernel_injector, drakvu
     printf("%d\n", nargs);
 
     // CreateProcess(NULL, TARGETPROC, NULL, NULL, 0, 0, NULL, NULL, &si, pi))
-    init_int_argument(&args[0], 0);
-    init_int_argument(&args[1], 0);
-    init_int_argument(&args[2], 0);
-    init_int_argument(&args[3], 0);
-    init_int_argument(&args[4], 0);
+    //init_int_argument(&args[0], 0);
+    //init_int_argument(&args[1], 0);
+    //init_int_argument(&args[2], 0);
+    //nit_int_argument(&args[3], 0);
+    //init_int_argument(&args[4], 0);
+    nargs = 0;
 
     bool success = setup_stack(kernel_injector->drakvuf, info, args, ARRAY_SIZE(args));
     return success;
@@ -157,104 +159,141 @@ static bool setup_create_process_stack(kernel_injector_t kernel_injector, drakvu
 
 static event_response_t win_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    bool success = false;
-    unsigned int nargs = 0;
-    size_t size = 0;
-    void* buf = NULL; // pointer to buffer to hold argument values
 
     kernel_injector_t kernel_injector = (kernel_injector_t) info->trap->data;
-    syscalls* s = kernel_injector->sc;
-    const syscall_t* sc = NULL;
-    PRINT_DEBUG("%p\n", kernel_injector->function_symbol->name);
-    PRINT_DEBUG("%d\n", kernel_injector->syscall_index);
-    PRINT_DEBUG("%s\n", kernel_injector->function_symbol->name);
-    PRINT_DEBUG("%lu\n", kernel_injector->function_symbol->rva);
-    memcpy(&kernel_injector->saved_regs, info->regs, sizeof(x86_registers_t));
 
-    addr_t ntoskrnl = drakvuf_get_kernel_base(drakvuf);
-    addr_t pa = ntoskrnl + kernel_injector->function_symbol->rva;
+    if (!kernel_injector->hijacked && kernel_injector->status == STATUS_NULL){
+        bool success = false;
+        unsigned int nargs = 0;
+        size_t size = 0;
+        void* buf = NULL; // pointer to buffer to hold argument values
 
-    if (kernel_injector->syscall_index>-1 )
-    {
-        // need to malloc buf before setting type of each array cell
-        sc = &win_syscalls[kernel_injector->syscall_index];
-        nargs = sc->num_args;
-        size = s->reg_size * nargs;
-        buf = (unsigned char*)g_malloc(sizeof(char)*size);
-    }
-    nargs=5;
+        syscalls* s = kernel_injector->sc;
+        const syscall_t* sc = NULL;
+        kernel_injector->trap_pa = info->trap_pa;
+        PRINT_DEBUG("Trapping happening at the point%lxn", info->trap_pa);
+        PRINT_DEBUG("Symbol Name, would be weird%p\n", kernel_injector->function_symbol->name);
+        PRINT_DEBUG("Syscall Index: %d\n", kernel_injector->syscall_index);
+        PRINT_DEBUG("%s\n", kernel_injector->function_symbol->name);
+        PRINT_DEBUG("Symbol RVA %lu\n", kernel_injector->function_symbol->rva);
+        memcpy(&kernel_injector->saved_regs, info->regs, sizeof(x86_registers_t));
 
-    //The code works fine with calling a function without any arguments
-    //Now trying to call a function with the arguments; calling CreateProcessA!
-    success = setup_create_process_stack(kernel_injector, info, nargs);
-    kernel_injector->target_rsp = info->regs->rsp;
-    if (!success)
-    {
-        PRINT_DEBUG("Failed to setup stack for passing inputs!\n");
-        return 0;
-    }
+        addr_t ntoskrnl = drakvuf_get_kernel_base(drakvuf);
+        addr_t pa = ntoskrnl + kernel_injector->function_symbol->rva;
 
-    kernel_injector->status = STATUS_CREATE_OK;
-
-    PRINT_DEBUG("%lu\n", pa);
-    info->regs->rip = pa;
-    return VMI_EVENT_RESPONSE_SET_REGISTERS;
-
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(kernel_injector->drakvuf);
-
-    access_context_t ctx;
-    ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
-    ctx.dtb = info->regs->cr3;
-    ctx.addr = pa;
-
-    if ( nargs )
-    {
-        // get arguments only if we know how many to get
-
-        if ( 4 == s->reg_size )
+        if (kernel_injector->syscall_index>-1 )
         {
-            // 32 bit os
-            ctx.addr = info->regs->rsp + s->reg_size;  // jump over base pointer
-
-            // multiply num args by 4 for 32 bit systems to get the number of bytes we need
-            // to read from the stack.  assumes standard calling convention (cdecl) for the
-            // visual studio compile.
-            if ( VMI_FAILURE == vmi_read(vmi, &ctx, size, buf, NULL) )
-                goto exit;
+            // need to malloc buf before setting type of each array cell
+            sc = &win_syscalls[kernel_injector->syscall_index];
+            nargs = sc->num_args;
+            size = s->reg_size * nargs;
+            buf = (unsigned char*)g_malloc(sizeof(char)*size);
         }
-        else
+        nargs=5; //TODO: getting this from input/dictionary
+
+        //The code works fine with calling a function without any arguments
+        //Now trying to call a function with the arguments; calling CreateProcessA!
+        success = setup_create_process_stack(kernel_injector, info, nargs);
+        kernel_injector->target_rsp = info->regs->rsp;
+        PRINT_DEBUG("Setting up stack is done!\n");
+        if (!success)
         {
-            // 64 bit os
-            uint64_t* buf64 = (uint64_t*)buf;
-            if ( nargs > 0 )
-                buf64[0] = info->regs->rcx;
-            if ( nargs > 1 )
-                buf64[1] = info->regs->rdx;
-            if ( nargs > 2 )
-                buf64[2] = info->regs->r8;
-            if ( nargs > 3 )
-                buf64[3] = info->regs->r9;
-            if ( nargs > 4 )
+            PRINT_DEBUG("Failed to setup stack for passing inputs!\n");
+            return 0;
+        }
+
+        kernel_injector->status = STATUS_CREATE_OK;
+        kernel_injector->hijacked = true;
+
+        PRINT_DEBUG("Fucntion address is :%lu\n", pa);
+        info->regs->rip = pa;
+        return VMI_EVENT_RESPONSE_SET_REGISTERS;
+
+        vmi_instance_t vmi = drakvuf_lock_and_get_vmi(kernel_injector->drakvuf);
+
+        access_context_t ctx;
+        ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
+        ctx.dtb = info->regs->cr3;
+        ctx.addr = pa;
+
+        if ( nargs )
+        {
+            // get arguments only if we know how many to get
+
+            if ( 4 == s->reg_size )
             {
-                // first 4 agrs passed via rcx, rdx, r8, and r9
-                ctx.addr = info->regs->rsp+0x28;  // jump over homing space + base pointer
-                size_t sp_size = s->reg_size * (nargs-4);
-                if ( VMI_FAILURE == vmi_read(vmi, &ctx, sp_size, &(buf64[4]), NULL) )
+                // 32 bit os
+                ctx.addr = info->regs->rsp + s->reg_size;  // jump over base pointer
+
+                // multiply num args by 4 for 32 bit systems to get the number of bytes we need
+                // to read from the stack.  assumes standard calling convention (cdecl) for the
+                // visual studio compile.
+                if ( VMI_FAILURE == vmi_read(vmi, &ctx, size, buf, NULL) )
                     goto exit;
             }
+            else
+            {
+                // 64 bit os
+                uint64_t* buf64 = (uint64_t*)buf;
+                if ( nargs > 0 )
+                    buf64[0] = info->regs->rcx;
+                if ( nargs > 1 )
+                    buf64[1] = info->regs->rdx;
+                if ( nargs > 2 )
+                    buf64[2] = info->regs->r8;
+                if ( nargs > 3 )
+                    buf64[3] = info->regs->r9;
+                if ( nargs > 4 )
+                {
+                    // first 4 agrs passed via rcx, rdx, r8, and r9
+                    ctx.addr = info->regs->rsp+0x28;  // jump over homing space + base pointer
+                    size_t sp_size = s->reg_size * (nargs-4);
+                    if ( VMI_FAILURE == vmi_read(vmi, &ctx, sp_size, &(buf64[4]), NULL) )
+                        goto exit;
+                }
+            }
         }
-    }
 
-    print_header(s->format, drakvuf, info);
-    if ( nargs )
+        print_header(s->format, drakvuf, info);
+        if ( nargs )
+        {
+            print_nargs(s->format, nargs);
+            print_args(s, drakvuf, info, sc, buf);
+        }
+
+    exit:
+        g_free(buf);
+        drakvuf_release_vmi(drakvuf);
+        return 0;
+    }   
+
+
+    if (kernel_injector->status == STATUS_CREATE_OK && kernel_injector->trap_pa == info->trap_pa)
     {
-        print_nargs(s->format, nargs);
-        print_args(s, drakvuf, info, sc, buf);
-    }
+        // We are now in the return path from CreateProcessW
 
-exit:
-    g_free(buf);
-    drakvuf_release_vmi(drakvuf);
+        PRINT_DEBUG("RAX: 0x%lx\n", info->regs->rax);
+
+        uint32_t threadid = 0;
+        if (!drakvuf_get_current_thread_id(kernel_injector->drakvuf, info, &threadid) || !threadid)
+            return false;
+        PRINT_DEBUG("Thread ID:%d\n", threadid);
+
+        
+        PRINT_DEBUG("WE are here, make arrangements to check if return value is correct. \n");
+
+
+        //kernel_injector->rc = info->regs->rax;
+        memcpy(info->regs, &kernel_injector->saved_regs, sizeof(x86_registers_t));
+
+        drakvuf_remove_trap(drakvuf, info->trap, NULL);
+        drakvuf_interrupt(drakvuf, SIGDRAKVUFERROR);
+
+        return VMI_EVENT_RESPONSE_SET_REGISTERS;
+    }
+    else if (kernel_injector->status == STATUS_CREATE_OK){
+        PRINT_DEBUG("Multi breakpoints mess up!");
+    }
     return 0;
 }
 
@@ -281,7 +320,7 @@ static GSList* create_trap_config(drakvuf_t drakvuf, syscalls* s, symbols_t* sym
             struct symbol* symbol = &symbols->symbols[i];
 
             //For now, taking a fixed function!!
-            if(!strncmp(symbol->name, "KeBugCheck\0", 11)){
+            if(!strncmp(symbol->name, "KeGetCurrentThread\0", 19)){
                 PRINT_DEBUG("%s\n", symbol->name);
                 memcpy(function_symbol, symbol, sizeof(struct symbol));
                 continue;
