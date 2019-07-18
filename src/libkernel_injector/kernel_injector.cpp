@@ -32,6 +32,11 @@ struct kernel_injector
     uint32_t         flags;
     struct symbol*   function_symbol;
 
+    //Related to function
+    char*   function_name;
+    int     number_of_arguments;
+    struct argument args[20];
+
     addr_t process_info;
     x86_registers_t saved_regs;
 
@@ -140,20 +145,15 @@ static void print_args(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* info
     }
 }
 
-static bool setup_create_process_stack(kernel_injector_t kernel_injector, drakvuf_trap_info_t* info, unsigned int nargs)
+static bool setup_create_process_stack(kernel_injector_t kernel_injector, drakvuf_trap_info_t* info)
 {
-    struct argument args[20] = { {0} };
+    int nargs = kernel_injector->number_of_arguments;
+    struct argument *args = kernel_injector->args;
     printf("%d\n", nargs);
 
     // CreateProcess(NULL, TARGETPROC, NULL, NULL, 0, 0, NULL, NULL, &si, pi))
-    //init_int_argument(&args[0], 0);
-    //init_int_argument(&args[1], 0);
-    //init_int_argument(&args[2], 0);
-    //nit_int_argument(&args[3], 0);
-    //init_int_argument(&args[4], 0);
-    nargs = 0;
 
-    bool success = setup_stack(kernel_injector->drakvuf, info, args, ARRAY_SIZE(args));
+    bool success = setup_stack(kernel_injector->drakvuf, info, args, nargs);
     return success;
 }
 
@@ -189,17 +189,17 @@ static event_response_t win_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             size = s->reg_size * nargs;
             buf = (unsigned char*)g_malloc(sizeof(char)*size);
         }
-        nargs=5; //TODO: getting this from input/dictionary
 
         //The code works fine with calling a function without any arguments
         //Now trying to call a function with the arguments; calling CreateProcessA!
-        success = setup_create_process_stack(kernel_injector, info, nargs);
+        success = setup_create_process_stack(kernel_injector, info);
         kernel_injector->target_rsp = info->regs->rsp;
+
         PRINT_DEBUG("Setting up stack is done!\n");
         if (!success)
         {
             PRINT_DEBUG("Failed to setup stack for passing inputs!\n");
-            return 0;
+            //return 0;
         }
 
         kernel_injector->status = STATUS_CREATE_OK;
@@ -270,7 +270,7 @@ static event_response_t win_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
     if (kernel_injector->status == STATUS_CREATE_OK && kernel_injector->trap_pa == info->trap_pa)
     {
-        // We are now in the return path from CreateProcessW
+        // We are now in the return path from the function
 
         PRINT_DEBUG("RAX: 0x%lx\n", info->regs->rax);
 
@@ -278,6 +278,7 @@ static event_response_t win_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         if (!drakvuf_get_current_thread_id(kernel_injector->drakvuf, info, &threadid) || !threadid)
             return false;
         PRINT_DEBUG("Thread ID:%d\n", threadid);
+        printf("Thread ID%d\n", threadid);
 
         
         PRINT_DEBUG("WE are here, make arrangements to check if return value is correct. \n");
@@ -293,6 +294,9 @@ static event_response_t win_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     }
     else if (kernel_injector->status == STATUS_CREATE_OK){
         PRINT_DEBUG("Multi breakpoints mess up!");
+    }
+    else{
+        PRINT_DEBUG("Some next level mess up!");
     }
     return 0;
 }
@@ -320,7 +324,7 @@ static GSList* create_trap_config(drakvuf_t drakvuf, syscalls* s, symbols_t* sym
             struct symbol* symbol = &symbols->symbols[i];
 
             //For now, taking a fixed function!!
-            if(!strncmp(symbol->name, "KeGetCurrentThread\0", 19)){
+            if(!strncmp(symbol->name, kernel_injector->function_name, strlen(kernel_injector->function_name))){  
                 PRINT_DEBUG("%s\n", symbol->name);
                 memcpy(function_symbol, symbol, sizeof(struct symbol));
                 continue;
@@ -455,7 +459,10 @@ syscalls::~syscalls()
 
 int kernel_injector_start(
     drakvuf_t drakvuf,
-    output_format_t format)
+    output_format_t format,
+    char* function_name,
+    int number_of_arguments,
+    struct argument args[])
 {
     int rc = 0;
     //PRINT_DEBUG("Target PID %u to start '%s'\n", pid, file);
@@ -464,6 +471,10 @@ int kernel_injector_start(
     //Initialising Injector Function
     kernel_injector->drakvuf = drakvuf;
     kernel_injector->is32bit = (drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E);
+    kernel_injector->function_name = function_name;
+    kernel_injector->number_of_arguments = number_of_arguments;
+    memcpy(kernel_injector->args, args, sizeof(argument)*number_of_arguments);
+
     kernel_injector->error_code.valid = false;
     kernel_injector->error_code.code = -1;
     kernel_injector->error_code.string = "<UNKNOWN>";

@@ -111,7 +111,7 @@
 #include <glib.h>
 
 #include "libdrakvuf/libdrakvuf.h"
-#include <libinjector/libinjector.h>
+#include <libkernel_injector/kernel_injector.h>
 
 void init_argument(struct argument* arg, argument_type_t type, size_t size, void* data)
 {

@@ -21,6 +21,9 @@ static inline void print_help(void)
     fprintf(stderr, "Required input:\n"
             "\t -r <rekall profile>       The Rekall profile of the OS kernel\n"
             "\t -d <domain ID or name>    The domain's ID or name\n"
+            "\t -f <function_name>        The kernel function to be called\n"
+            "\t -n <number_of_arguments>  Number of arguments needed in teh function\n"
+            "\t -a <arguments>            arguments to the kernel function\n"
             "Optional inputs:\n"
             //For now, I am just calling a particular function
             //TODO: Take the function name and arguments.
@@ -40,14 +43,20 @@ int main(int argc, char** argv)
     char* domain = NULL;
     bool verbose = 0;
     bool libvmi_conf = false;
+    int number_of_arguments = 0;
+    char* function_name = NULL;
+    int lcount = 0;
+    struct argument args[20] = { {0} };
+    char *next = NULL;
+    int index;
 
-    if (argc < 2)
+    if (argc < 4)
     {
         print_help();
         return 1;
     }
 
-    while ((c = getopt (argc, argv, "r:d:vl")) != -1)
+    while ((c = getopt (argc, argv, "r:d:f:n:avl")) != -1)
         switch (c)
         {
             case 'r':
@@ -64,12 +73,34 @@ int main(int argc, char** argv)
             case 'l':
                 libvmi_conf = true;
                 break;
+            case 'f':
+                function_name = optarg;
+                break;
+            case 'n':
+                number_of_arguments = atoi(optarg);
+                break;
+            case 'a':
+                index = optind;
+                while(lcount < number_of_arguments){
+                    next = strdup(argv[index]); /* get login */
+                    index++;
+                    if(next[0] != '-'){         /* check if optarg is next switch */
+                        init_int_argument(&args[lcount], atoi(next));
+                    }
+                    else break;
+                    lcount++;
+                }
+                if(lcount != number_of_arguments){
+                    print_help();
+                    return 1;
+                }
+                break;
             default:
                 fprintf(stderr, "Unrecognized option: %c\n", c);
                 return rc;
         }
 
-    if ( !rekall_profile || !domain)
+    if ( !rekall_profile || !domain || !function_name || !number_of_arguments)
     {
         print_help();
         return 1;
@@ -92,9 +123,9 @@ int main(int argc, char** argv)
     }
 
     printf("Kernel Injector starting");
-    //TODO: Adding name of kernel function we want to start and the arguments to it in the functions!
 
-    int kernel_injection_result = kernel_injector_start(drakvuf, OUTPUT_DEFAULT);
+    int kernel_injection_result = kernel_injector_start(drakvuf, OUTPUT_DEFAULT, function_name,
+                                                        number_of_arguments, args);
 
     if (kernel_injection_result)
         printf("Process kernel_injection success\n");

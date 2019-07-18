@@ -90,7 +90,10 @@ public:
 
 int kernel_injector_start(
     drakvuf_t drakvuf,
-    output_format_t format);
+    output_format_t format,
+    char* function_name,
+    int number_of_arguments,
+    struct argument args[]);
 //TODO: Add arguments and the function you want to call. 
 
 
