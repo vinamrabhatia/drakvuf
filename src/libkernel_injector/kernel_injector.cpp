@@ -36,6 +36,8 @@ struct kernel_injector
     char*   function_name;
     int     number_of_arguments;
     struct argument args[20];
+    int number_of_string_args;
+    unicode_string_t* string_args[20];
 
     addr_t process_info;
     x86_registers_t saved_regs;
@@ -145,13 +147,52 @@ static void print_args(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* info
     }
 }
 
+
+static unicode_string_t* convert_utf8_to_utf16(char const* str)
+{
+    if (!str) return NULL;
+
+    unicode_string_t us =
+    {
+        .contents = (uint8_t*)g_strdup(str),
+        .length = strlen(str),
+        .encoding = "UTF-8",
+    };
+
+    if (!us.contents) return NULL;
+
+    unicode_string_t* out = (unicode_string_t*)g_malloc0(sizeof(unicode_string_t));
+    if (!out)
+    {
+        g_free(us.contents);
+        return NULL;
+    }
+
+    status_t rc = vmi_convert_str_encoding(&us, out, "UTF-16LE");
+    g_free(us.contents);
+
+    if (VMI_SUCCESS == rc)
+        return out;
+
+    g_free(out);
+    return NULL;
+}
+
 static bool setup_create_process_stack(kernel_injector_t kernel_injector, drakvuf_trap_info_t* info)
 {
     int nargs = kernel_injector->number_of_arguments;
     struct argument *args = kernel_injector->args;
     printf("%d\n", nargs);
+    int string_args = 0;
 
     // CreateProcess(NULL, TARGETPROC, NULL, NULL, 0, 0, NULL, NULL, &si, pi))
+    for (int i = 0; i < nargs; i++)
+    {
+        if(args[i].type == ARGUMENT_STRING){
+            init_unicode_argument(&args[i], kernel_injector->string_args[string_args]);
+            string_args++;
+        }
+    }
 
     bool success = setup_stack(kernel_injector->drakvuf, info, args, nargs);
     return success;
@@ -462,7 +503,9 @@ int kernel_injector_start(
     output_format_t format,
     char* function_name,
     int number_of_arguments,
-    struct argument args[])
+    struct argument args[],
+    unicode_string_t string_args[],
+    int number_of_string_args)
 {
     int rc = 0;
     //PRINT_DEBUG("Target PID %u to start '%s'\n", pid, file);
@@ -473,6 +516,8 @@ int kernel_injector_start(
     kernel_injector->is32bit = (drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E);
     kernel_injector->function_name = function_name;
     kernel_injector->number_of_arguments = number_of_arguments;
+    kernel_injector->number_of_string_args = number_of_string_args;
+    memcpy(kernel_injector->string_args, string_args, sizeof(argument)*number_of_string_args);
     memcpy(kernel_injector->args, args, sizeof(argument)*number_of_arguments);
 
     kernel_injector->error_code.valid = false;

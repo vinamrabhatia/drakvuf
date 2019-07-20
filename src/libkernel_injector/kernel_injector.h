@@ -93,8 +93,9 @@ int kernel_injector_start(
     output_format_t format,
     char* function_name,
     int number_of_arguments,
-    struct argument args[]);
-//TODO: Add arguments and the function you want to call. 
+    struct argument args[],
+    unicode_string_t* string_args[],
+    int number_of_string_args);
 
 
 #pragma GCC visibility pop

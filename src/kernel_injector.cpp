@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <signal.h>
 #include <unistd.h>
+#include <inttypes.h>
 #include <libvmi/libvmi.h>
 
 #include <libdrakvuf/libdrakvuf.h>
@@ -49,6 +50,8 @@ int main(int argc, char** argv)
     struct argument args[20] = { {0} };
     char *next = NULL;
     int index;
+    unicode_string_t* string_args[20];
+    int number_of_string_args = 0;
 
     if (argc < 4)
     {
@@ -85,7 +88,19 @@ int main(int argc, char** argv)
                     next = strdup(argv[index]); /* get login */
                     index++;
                     if(next[0] != '-'){         /* check if optarg is next switch */
-                        init_int_argument(&args[lcount], atoi(next));
+                        if(next[0]=='i'){
+                            next = strdup(argv[index]); /* get login */
+                            index++;
+                            init_int_argument(&args[lcount], atoi(next));
+                        }
+                        else if(next[0]=='s'){
+                            //Convert into
+                            next = strdup(argv[index]);
+                            index++;
+                            string_args[number_of_string_args] = convert_utf8_to_utf16(next);
+                            init_unicode_argument(&args[lcount], string_args[number_of_string_args]);
+                            number_of_string_args++;
+                        }
                     }
                     else break;
                     lcount++;
@@ -125,7 +140,8 @@ int main(int argc, char** argv)
     printf("Kernel Injector starting");
 
     int kernel_injection_result = kernel_injector_start(drakvuf, OUTPUT_DEFAULT, function_name,
-                                                        number_of_arguments, args);
+                                                        number_of_arguments, args,
+                                                        string_args, number_of_string_args);
 
     if (kernel_injection_result)
         printf("Process kernel_injection success\n");
