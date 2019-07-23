@@ -504,7 +504,7 @@ int kernel_injector_start(
     char* function_name,
     int number_of_arguments,
     struct argument args[],
-    unicode_string_t string_args[],
+    unicode_string_t* string_args[],
     int number_of_string_args)
 {
     int rc = 0;

@@ -115,7 +115,7 @@ int main(int argc, char** argv)
                 return rc;
         }
 
-    if ( !rekall_profile || !domain || !function_name || !number_of_arguments)
+    if ( !rekall_profile || !domain || !function_name)
     {
         print_help();
         return 1;
