@@ -104,7 +104,7 @@
 
 bin_PROGRAMS = drakvuf xen_memclone injector kernel_injector
 
-SUBDIRS = xen_helper libdrakvuf libinjector plugins dirwatch libkernel_injector
+SUBDIRS = xen_helper libdrakvuf libinjector plugins dirwatch libkernel_injector fuzzer
 
 drakvuf_SOURCES = main.cpp drakvuf.cpp
 xen_memclone_SOURCES  = xen_memclone.c

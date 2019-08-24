@@ -521,6 +521,7 @@ AC_CONFIG_FILES([Makefile src/Makefile
                  src/plugins/Makefile
                  src/dirwatch/Makefile
                  src/libkernel_injector/Makefile
+                 src/fuzzer/Makefile
                ])
 
 AC_OUTPUT

@@ -92,6 +92,8 @@ int main(int argc, char** argv)
                             next = strdup(argv[index]); /* get login */
                             index++;
                             init_int_argument(&args[lcount], atoi(next));
+                            if(next != NULL)
+                                fprintf(stdout, "%d\n", atoi(next));
                         }
                         else if(next[0]=='s'){
                             //Convert into
