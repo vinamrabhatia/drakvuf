@@ -120,7 +120,7 @@ use warnings;
 ## Settings
 #
 # The LVM volume group
-our $lvm_vg = "t0vg";
+our $lvm_vg = "vgpool";
 # Clone network bridge name
 our $clone_bridge = "xenbr1";
 # Vif script to pass to clone Xen config.
@@ -176,32 +176,6 @@ sub clone {
             next;
         }
 
-        if(index($1, "vif") != -1) {
-            my @values = split(',', $1);
-            my $value;
-            my $count = 0;
-            foreach $value (@values) {
-                if(index($value, "bridge")!=-1 && index($value, "vif-bridge")==-1) {
-                    print $fh "bridge=$clone_bridge.$vlan,$vif_script";
-                } else {
-                    if(index($value, "script")==-1 && index($value, "backend")==-1) {
-                        print $fh "$value";
-                    } else {
-                        if($count == $#values) {
-                            print $fh "']";
-                        }
-                    }
-                }
-
-                if($count < $#values) {
-                    print $fh ",";
-                }
-                $count++;
-            }
-            print $fh "\n";
-            next;
-        }
-
         if(index($1, "disk") != -1) {
             my $disk = $1;
             my $pos = index($disk, $origin);
@@ -222,6 +196,9 @@ sub clone {
     close $fh;
 
     `$xl pause $origin 2>&1`;
+    
+    print STDERR "Could not open file\n";
+    print STDERR $clone;
 
     my $test = `$lvdisplay /dev/$lvm_vg/$clone 2>&1`;
     if(($test =~ tr/\n//) != 1) {

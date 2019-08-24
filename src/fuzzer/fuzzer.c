@@ -227,7 +227,7 @@ int main(int argc, char** argv)
     char line[100] = {0};
     size_t read_bytes = 0;
 
-    if (argc!=14)
+    if (argc!=12)
     {
         printf("Not enough arguments: %i!\n", argc);
         printf("%s <loop (0) or poll (1)> <origin domain name> <domain config> <rekall_profile> <kernel_function> <number_of_args> <input_file> <max clones> <clone_script> <kernel_injector_script> <cleanup_script>\n", argv[0]);
@@ -280,7 +280,9 @@ int main(int argc, char** argv)
 
     int threadid = -1;
 
+    printf("%s\n", input_file);
     file_pointer = fopen(input_file, "r");
+
     if(file_pointer == NULL){
         shutting_down = 1;
     }
