@@ -72,7 +72,7 @@ This is still a very good candidate method but I am yet to figure out how exactl
   
 Lastly, I found out about <b>AFL-Unicorn</b> and I hope this can help us greatly.
 Unicorn is an emulator. All unicorn does basically is it takes the binary code and executes instructions one by one. This can basically fuzz anything that the unicorn engine can emulate. This works by emulation the block-edge instrumentation. AFL basically uses the block coverage from any emulated code snippet to drive its input generation.
-Basically, we set up a breakpoint at the location which we want to fuzz, run the program. When we hit the breakpoint, we need to be able to dump memory, dump CPU state, and basically the complete memory snapshot of what we want to fuzz.
+We set up a breakpoint at the location which we want to fuzz, run the program. When we hit the breakpoint, we need to be able to dump memory, dump CPU state, and basically the complete memory snapshot of what we want to fuzz.
 Now we take the saved state and write a unicorn script, which takes the saved state and emulate the further code of the syscall function. It has all the benefits of AFL(guided coverage and effective mutation of test cases). And allows us to fuzz the part of the code that we want. It seemed for a while that I have found the perfect candidate for the position. 
 
 Howwever, with further discussions, it came to my understanding that it will probably be a better idea to keep everything going within the hypervisor. 
@@ -86,10 +86,29 @@ I realised that I really need to figure out how the coverage guided thing actual
 Struggling through that for a few days and with the end of the project coming nearer, I  thought it might be better that first I implement a simple fuzzer as a proof of concept of hooking syscalls, and restoring snapshots on crash, to which a more sophisticated fuzzer can be plugged into later. After multiple attemps, I was able to create clone VM machines running the kernel-injector script with the arguments that I supply. 
 
 ### Current Project State and TODOs:
-If you prefer to not use the automatic generator, push a branch named `gh-pages` to your repository to create a page manually. In addition to supporting regular HTML content, GitHub Pages support Jekyll, a simple, blog aware static site generator written by our own Tom Preston-Werner. Jekyll makes it easy to create site-wide headers and footers without having to copy them across every page. It also offers intelligent blog support and other advanced templating features.
+
+All of the code committed in the project lies in the commits made by @vinamrabhatia handle at https://github.com/vinamrabhatia/drakvuf/tree/kernel_injector . 
+
+src/kernel_injector achieves the first half of project, and it takes in the arguments and the function name of the kernel, redirects to that function in the kernel mode and returns back to the normal executation of the function. 
+```
+sudo ./kernel_injector -r windows7-sp1.rekall.json -d 1 -f KeBugCheckEx -n 5 -a i 0 i 1 i 2 i 3 i 4 
+```
+
+src/fuzzer achieves the remaining project. The fuzzer takes in all the necessary arguments, clone a snapshot of the running guest, calls the functions and retunrs back. It is meant to take arguments of the target function from a file supplied by the fuzzer. 
+
+```
+sudo ./fuzzer <loop (0) or poll (1)> <origin domain name> <domain config> <rekall_profile> <kernel_function> <number_of_args> <input_file> <max clones> <clone_script> <kernel_injector_script> <cleanup_script>
+```
+
+clone_script, kernel_injector_script and cleanup script are available in tools directory. 
+
+TODOs:
+
+I have implemented a simple fuzzer as a proof of concept of hooking syscalls, and restoring snapshots on crash, to which a more sophisticated fuzzer can be plugged into later.
+
+The main leftover of the project is to make the fuzzer get the feedback from the kernel, and accordingly redirect/mutate the possible inputs
+
 
 ### Authors and Contributors
 You can @mention a GitHub username to generate a link to their profile. The resulting `<a>` element will link to the contributor's GitHub Profile. For example: In 2007, Chris Wanstrath (@defunkt), PJ Hyett (@pjhyett), and Tom Preston-Werner (@mojombo) founded GitHub.
 
-### Support or Contact
-Having trouble with Pages? Check out the documentation at http://help.github.com/pages or contact support@github.com and we’ll help you sort it out.
