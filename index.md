@@ -1,5 +1,8 @@
-### Welcome to GitHub Pages.
-This automatic page generator is the easiest way to create beautiful pages for all of your projects. Author your page content here using GitHub Flavored Markdown, select a template crafted by a designer, and publish. After your page is generated, you can check out the new branch:
+### About the Project
+
+##Fuzzing 
+
+Fuzzing is an software testing technique for finding out security vulnerabilities. Although it appears as a very naive technique, fuzzing has shown to scale well and be remarkably effective in revealing vulnerabilities and undefined behaviour in software. Traditionally, fuzzing tools used to apply random mutations to well formed inputs and feed them to the target program for possible security exceptions. Fuzzing has evolved over the years, inspired by the recent advances in symbolic execution. Coverage guided fuzzing uses techniques like program instrumentation and genetic algorithms to trace the code coverage reached by each input fed to a fuzz target. There are well established tools available which can help in fuzzing of user space, AFL being one of the most prominent among those. Some efforts have been made to find security vulnerabilities in system calls (eg syzkaller) and these projects are  in active development. However, fuzzing operating systems using hypervisor has not been explored much. 
 
 ```
 $ cd your_repo_root/repo_name
