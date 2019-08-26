@@ -1,18 +1,20 @@
 ### About the Project
 
+The most critical components of the project here are 'Hypervisor' and 'Fuzzer'. Here is a quick glance of following.
+
 #### Fuzzing 
 
 Fuzzing is an software testing technique for finding out security vulnerabilities. Although it appears as a very naive technique, fuzzing has shown to scale well and be remarkably effective in revealing vulnerabilities and undefined behaviour in software. Traditionally, fuzzing tools used to apply random mutations to well formed inputs and feed them to the target program for possible security exceptions. Fuzzing has evolved over the years, inspired by the recent advances in symbolic execution. Coverage guided fuzzing uses techniques like program instrumentation and genetic algorithms to trace the code coverage reached by each input fed to a fuzz target. There are well established tools available which can help in fuzzing of user space, AFL being one of the most prominent among those. Some efforts have been made to find security vulnerabilities in system calls (eg syzkaller) and these projects are  in active development. However, fuzzing operating systems using hypervisor has not been explored much. 
 
+To have a look at what effective fuzzing has achieved in the past, head over to http://lcamtuf.coredump.cx/afl/ and have a look at the 'Bug-o-Rama Trophy Case'
+
 #### DRAKVUF
 
-DRAKVUF is a black-box binary analysis system. DRAKVUF is capable of trapping execution of any code in the analysis VM. It inserts breakpoint at desired locations which forwards such events to the control domain, hence providing fidelity. It also provides scalability by making use of Xen’s Copy-on-Write memory interface and Linux Copy-on-write storage interface, hence making optimised use of hardware. It was initially designed to act as a malware analysis system. But with its unique ability to to fetch in-depth execution tracking of execution binary without having to install any special software (hence being stealth), it can find its application in several other areas. DRAKVUF has a libinjector library which can hijack any arbitrary running process running inside the VM and set up the stack to call CreateProcessA function. This was originally meant to initiate the execution of the sample.
+DRAKVUF is a black-box binary analysis system built on top of Xen(a type-1 hypervisor). DRAKVUF is capable of trapping execution of any code in the analysis VM. It inserts breakpoint at desired locations which forwards such events to the control domain, hence providing fidelity. It also provides scalability by making use of Xen’s Copy-on-Write memory interface and Linux Copy-on-write storage interface, hence making optimised use of hardware. It was initially designed to act as a malware analysis system. But with its unique ability to to fetch in-depth execution tracking of execution binary without having to install any special software (hence being stealth), it can find its application in several other areas. DRAKVUF has a libinjector library which can hijack any arbitrary running process running inside the VM and set up the stack to call CreateProcessA function. This was originally meant to initiate the execution of the sample.
 
-#### Major Aim of the Project
+#### Goal of the Project
 
 The aim of the project is to integrate AFL with DRAKVUF’s libinjector and perform fuzzing on kernel functions. So, the goal is to get the AFL to work and figure out the challenges involved in the process. The major idea is to explore the limitations of fuzzing the operating system with the help of a hypervisor. Since not much efforts have been done in this aspect, we aimed to find out how effective the technique is in the kernel space. Hence, the project involves a lot of experiments to find out solutions to the problems.
-
-#### Project Goals
 
 The project here can be distinctively divided into 2 parts here.
 
@@ -29,7 +31,7 @@ $ git fetch origin
 $ git checkout gh-pages
 ```
 
-### Designer Templates
+#### Issues Encountered
 We've crafted some handsome templates for you to use. Go ahead and continue to layouts to browse through them. You can easily go back to edit your page before publishing. After publishing your page, you can revisit the page generator and switch to another theme. Your Page content will be preserved if it remained markdown format.
 
 ### Rather Drive Stick?
