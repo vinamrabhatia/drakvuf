@@ -1,5 +1,5 @@
-title: Drakvuf
-description: DRAKVUF Dynamic Malware Analysis System
+title: Google Summer of Code 2019: OSFuzz
+description: Fuzzing an Operating System with Hypervisor
 google_analytics: 
 show_downloads: true
 theme: jekyll-theme-slate
