@@ -215,7 +215,6 @@ static event_response_t win_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         PRINT_DEBUG("Trapping happening at the point%lxn", info->trap_pa);
         PRINT_DEBUG("Symbol Name, would be weird%p\n", kernel_injector->function_symbol->name);
         PRINT_DEBUG("Syscall Index: %d\n", kernel_injector->syscall_index);
-        PRINT_DEBUG("%s\n", kernel_injector->function_symbol->name);
         PRINT_DEBUG("Symbol RVA %lu\n", kernel_injector->function_symbol->rva);
         memcpy(&kernel_injector->saved_regs, info->regs, sizeof(x86_registers_t));
 
@@ -319,10 +318,6 @@ static event_response_t win_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         if (!drakvuf_get_current_thread_id(kernel_injector->drakvuf, info, &threadid) || !threadid)
             return false;
         PRINT_DEBUG("Thread ID:%d\n", threadid);
-        printf("Thread ID%d\n", threadid);
-
-        
-        PRINT_DEBUG("WE are here, make arrangements to check if return value is correct. \n");
 
 
         //kernel_injector->rc = info->regs->rax;
@@ -332,12 +327,6 @@ static event_response_t win_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         drakvuf_interrupt(drakvuf, SIGDRAKVUFERROR);
 
         return VMI_EVENT_RESPONSE_SET_REGISTERS;
-    }
-    else if (kernel_injector->status == STATUS_CREATE_OK){
-        PRINT_DEBUG("Multi breakpoints mess up!");
-    }
-    else{
-        PRINT_DEBUG("Some next level mess up!");
     }
     return 0;
 }
@@ -376,8 +365,6 @@ static GSList* create_trap_config(drakvuf_t drakvuf, syscalls* s, symbols_t* sym
 
             PRINT_DEBUG("[SYSCALLS] Adding trap to %s\n", symbol->name);
 
-            //syscall_wrapper_t* wrapper = (syscall_wrapper_t*)g_malloc(sizeof(syscall_wrapper_t));
-
             kernel_injector->syscall_index = -1;
             kernel_injector->sc=s;
             kernel_injector->function_symbol=function_symbol;
@@ -406,10 +393,6 @@ static GSList* create_trap_config(drakvuf_t drakvuf, syscalls* s, symbols_t* sym
             trap->data = kernel_injector;          
 
             ret = g_slist_prepend(ret, trap);
-            //PRINT_DEBUG("NAME: %s\n", wrapper->function_symbol->name);
-            //PRINT_DEBUG("%p\n", wrapper->function_symbol);
-            //PRINT_DEBUG("%p\n", wrapper->function_symbol->name);
-            //PRINT_DEBUG("%lu\n", wrapper->function_symbol->rva);
         }
     }
 
