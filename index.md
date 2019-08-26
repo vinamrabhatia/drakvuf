@@ -19,7 +19,7 @@ The aim of the project is to integrate AFL with DRAKVUF’s libinjector and perf
 The project here can be distinctively divided into 2 parts here.
 
 1. Modifying libinjector to execute arbitrary functions:
-The earlier implementation of the libinjector hijacks an arbitrary process and checks if kernel32.dll is loaded. It the sets up the stack for the execution of CreateProcessA function. The first part of the project was to extend the libinjector library so that it can call arbitrary functions inside the Windows kernel, along with the arguments which we provide.
+The earlier implementation of the libinjector hijacks an arbitrary process and checks if kernel32.dll is loaded. It the sets up the stack for the execution of CreateProcessA function. The first part of the project was to extend the libinjector library so that it can call arbitrary functions inside the Windows kernel, along with the arguments which we provide. I came up with a couple of approaches to get the first part done, and after a good discussion with my mentor, we firmed up on a idea. I was earlier trying to trap the sys
 
 2. Integration of the fuzzer:
 The next and final goal was to check and figure out the variable possible ways to integrate a fuzzer with the current setup. 
@@ -31,8 +31,32 @@ $ git fetch origin
 $ git checkout gh-pages
 ```
 
-#### Issues Encountered
-We've crafted some handsome templates for you to use. Go ahead and continue to layouts to browse through them. You can easily go back to edit your page before publishing. After publishing your page, you can revisit the page generator and switch to another theme. Your Page content will be preserved if it remained markdown format.
+### Hurdles on the way
+
+Before diving into the project, I knew that certain parts of the project will be particularly difficult. Some of the issues I encountered in the later part of the project were a lot more difficult than I earlier expected. Dividing the section into two parts as the project, here we go.
+
+Part 1: Extending the libinjector
+Not having used Windows for the past 3 years and having always preferred a Unix environment, I thought that there would be a teep learning curve about the internals of Windows. However, I was pretty pleased to find out all the underlying concepts to be exaclty the same. Understanding the internals turned out to be a relatively easy task and I was confident about it within a week.
+
+I was picky about trapping the kernel entry point, from where I will set up the stack and change the rip to my desired target function. Digging deeper, I read about how the system call entry point is itself referenced in syscall_init(), a function that is called early in the kernel's startup sequence. I believed that this would be the most efficient way to solve our problem. Spending close to 2 weeks on this and not making any good progress, I reverted back to what was suggested by Tamas. I used the drakvuf syscall plugin to set up a breakpoint at each of the Windows syscall. Rekall profile for the windows version supplied the address of the target function. Now, as soon as I receive the trap, I would redirect the flow of the control by diverting the execution to the desired function, after setting up the stack for that function. 
+
+The next and pretty obvious step was to modify the kernel-injector file to take the arguments from the command file, and making sure that the setup works for 32 bit machines as well. 
+
+Getting the GUID for 32 bit machines didnt work as it was working for 64 bit machines, and a significant chuck on time went away there. A quick glimpse of terminal commands which did the job.
+
+```
+$ sudo kpartx -l /dev/vgpool_32bit/win7_sp1_32  # This will show all the partiions in the volumn, e,g
+vgpool_32bit/win7_sp1_32_1 : 0 204800 /dev/vgpool_32bit/win7_sp1_32 2048
+vgpool_32bit/win7_sp1_32_2 : 0 41734144 /dev/vgpool_32bit/win7_sp1_32 206848
+$ sudo kpartx -a /dev/vgpool_32bit/lwin7_sp1_32
+$ sudo mount -o ro /dev/mapper/vgpool_32bit/win7_sp1_32_2 /mnt  # might change partion to find the Windows/ folder
+$ sudo rekal peinfo -f /mnt/Windows/System32/ntoskrnl.exe > /temp/peinfo.txt
+$ sudo umount /mnt
+$ sudo kpartx -d /dev/vgpool_32bit/lwin7_sp1_32
+```
+
+Part 2: Integration of the Fuzzer
+
 
 ### Rather Drive Stick?
 If you prefer to not use the automatic generator, push a branch named `gh-pages` to your repository to create a page manually. In addition to supporting regular HTML content, GitHub Pages support Jekyll, a simple, blog aware static site generator written by our own Tom Preston-Werner. Jekyll makes it easy to create site-wide headers and footers without having to copy them across every page. It also offers intelligent blog support and other advanced templating features.
