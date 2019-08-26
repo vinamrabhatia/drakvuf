@@ -22,20 +22,14 @@ The project here can be distinctively divided into 2 parts here.
 The earlier implementation of the libinjector hijacks an arbitrary process and checks if kernel32.dll is loaded. It the sets up the stack for the execution of CreateProcessA function. The first part of the project was to extend the libinjector library so that it can call arbitrary functions inside the Windows kernel, along with the arguments which we provide. I came up with a couple of approaches to get the first part done, and after a good discussion with my mentor, we firmed up on a idea. I was earlier trying to trap the sys
 
 2. Integration of the fuzzer:
-The next and final goal was to check and figure out the variable possible ways to integrate a fuzzer with the current setup. 
+The next and final goal was to check and figure out the various possible ways to integrate a fuzzer with the current setup. 
 
-
-```
-$ cd your_repo_root/repo_name
-$ git fetch origin
-$ git checkout gh-pages
-```
 
 ### Hurdles on the way
 
 Before diving into the project, I knew that certain parts of the project will be particularly difficult. Some of the issues I encountered in the later part of the project were a lot more difficult than I earlier expected. Dividing the section into two parts as the project, here we go.
 
-Part 1: Extending the libinjector
+#### Part 1: Extending the libinjector
 Not having used Windows for the past 3 years and having always preferred a Unix environment, I thought that there would be a teep learning curve about the internals of Windows. However, I was pretty pleased to find out all the underlying concepts to be exaclty the same. Understanding the internals turned out to be a relatively easy task and I was confident about it within a week.
 
 I was picky about trapping the kernel entry point, from where I will set up the stack and change the rip to my desired target function. Digging deeper, I read about how the system call entry point is itself referenced in syscall_init(), a function that is called early in the kernel's startup sequence. I believed that this would be the most efficient way to solve our problem. Spending close to 2 weeks on this and not making any good progress, I reverted back to what was suggested by Tamas. I used the drakvuf syscall plugin to set up a breakpoint at each of the Windows syscall. Rekall profile for the windows version supplied the address of the target function. Now, as soon as I receive the trap, I would redirect the flow of the control by diverting the execution to the desired function, after setting up the stack for that function. 
@@ -55,7 +49,31 @@ $ sudo umount /mnt
 $ sudo kpartx -d /dev/vgpool_32bit/lwin7_sp1_32
 ```
 
-Part 2: Integration of the Fuzzer
+#### Part 2: Integration of the Fuzzer
+
+Here comes the most difficult part of the project. After trying my hands around all over the place, I discussed with my mentor on how to proceed, and the only way ahead that I could see was to go through the following steps:  outline on 1) how afl's code coverage is supposed to work 2) what ideas you had about integrating it into your os fuzzing tool 3) what worked / what didn't work / what wasn't tested.
+
+And here is a brief summary of the above details.
+
+As I understand, firstly we compile the binary with AFL. This leads to block-edge instrumentation in the binary.
+In coverage-guided fuzzing, we first supply AFL with a set of test-cases. These test cases form the initial corpus of inputs and form a queue to the AFL. AFL tries to mutate these cases and supply them to the program. With the instrumentation done, it gets the feedback about the program control . So if any of the generated mutations resulted in a new state transition recorded by the instrumentation, add mutated output as a new entry in the queue.
+
+The first option was to check the <b>AFL Qemu mode</b>, which allows us to do black-box fuzzing. So, I stepped in and tried to get AFL working in the Qemu mode. Due to some compatibility issues with the version of Qemu AFL was downloading, I wasted a significant amount on this. After getting it working, I realised this method will not be useful for us at all.
+
+In the black box fuzzing mode, AFL does on the fly instrumentation of black-box binaries. This is done by QEMU running in the "user space emulation" mode. So, in user space mode, QEMU doesn’t emulate all the hardware, but only the CPU. It executes foreign code in the emulated CPU, and then it captures the syscalls and forwards them to the host kernel. Basically, it seems that all the kernel level code won’t be emulated by QEMU and highly likely that the method won’t work. Besides, I was unable to figure out any step to proceed with the integration.
+
+Then, I came across <b>LibFuzzer</b>. This gave me some hope since with this, one can kinda do targeted fuzzing of functions, also it is a guided in-process fuzzing. (everything in a single process, so probably faster). But with my understanding, for this to work, I think source code is a necessity, and we are trying to fuzz functions in a closed source running Kernel. 
+
+Then, I came across this project on Github called <a href="https://github.com/googleprojectzero/winafl"> WinAFL </a>. This project is basically a fork of AFL that uses different instrumentation modes, majorly using DynamoRIO.
+Also, to improve startup time, it relies heavily on persistent fuzzing mode, that is, executing multiple input samples without restarting the target process. This is accomplished by selecting a target function (that the user wants to fuzz) and instrumenting it so that it runs in a loop.
+This is still a very good candidate method but I am yet to figure out how exactly I can integrate this. It is mainly designed for user-level applications.
+
+<a href="https://github.com/hfiref0x/NtCall64"><NtCall64</a> : This is another project which brute-forces a service and tries to call them with all sort of inputs. It can cause the system to crash, and it is basically trying to call user level corresponding functions of those syscalls. As I understand, no coverage-guide. So, this is a very dumb fuzzer basically.
+  
+Lastly, I found out about <b>AFL-Unicorn</b> and I hope this can help us greatly.
+Unicorn is an emulator. All unicorn does basically is it takes the binary code and executes instructions one by one. This can basically fuzz anything that the unicorn engine can emulate. This works by emulation the block-edge instrumentation. AFL basically uses the block coverage from any emulated code snippet to drive its input generation.
+Basically, we set up a breakpoint at the location which we want to fuzz, run the program. When we hit the breakpoint, we need to be able to dump memory, dump CPU state, and basically the complete memory snapshot of what we want to fuzz.
+Now we take the saved state and write a unicorn script, which takes the saved state and emulate the further code of the syscall function. It has all the benefits of AFL(guided coverage and effective mutation of test cases). And allows us to fuzz the part of the code that we want. It seemed for a while that I have found the perfect candidate for the position. 
 
 
 ### Rather Drive Stick?
