@@ -68,15 +68,24 @@ Then, I came across this project on Github called <a href="https://github.com/go
 Also, to improve startup time, it relies heavily on persistent fuzzing mode, that is, executing multiple input samples without restarting the target process. This is accomplished by selecting a target function (that the user wants to fuzz) and instrumenting it so that it runs in a loop.
 This is still a very good candidate method but I am yet to figure out how exactly I can integrate this. It is mainly designed for user-level applications.
 
-<a href="https://github.com/hfiref0x/NtCall64"><NtCall64</a> : This is another project which brute-forces a service and tries to call them with all sort of inputs. It can cause the system to crash, and it is basically trying to call user level corresponding functions of those syscalls. As I understand, no coverage-guide. So, this is a very dumb fuzzer basically.
+<a href="https://github.com/hfiref0x/NtCall64">NtCall64</a> : This is another project which brute-forces a service and tries to call them with all sort of inputs. It can cause the system to crash, and it is basically trying to call user level corresponding functions of those syscalls. As I understand, no coverage-guide. So, this is a very dumb fuzzer basically.
   
 Lastly, I found out about <b>AFL-Unicorn</b> and I hope this can help us greatly.
 Unicorn is an emulator. All unicorn does basically is it takes the binary code and executes instructions one by one. This can basically fuzz anything that the unicorn engine can emulate. This works by emulation the block-edge instrumentation. AFL basically uses the block coverage from any emulated code snippet to drive its input generation.
 Basically, we set up a breakpoint at the location which we want to fuzz, run the program. When we hit the breakpoint, we need to be able to dump memory, dump CPU state, and basically the complete memory snapshot of what we want to fuzz.
 Now we take the saved state and write a unicorn script, which takes the saved state and emulate the further code of the syscall function. It has all the benefits of AFL(guided coverage and effective mutation of test cases). And allows us to fuzz the part of the code that we want. It seemed for a while that I have found the perfect candidate for the position. 
 
+Howwever, with further discussions, it came to my understanding that it will probably be a better idea to keep everything going within the hypervisor. 
 
-### Rather Drive Stick?
+In other terms, the coverage guidance part of AFL is telling AFL which inputs to mutate more because a certain new path is discovered. Hence, 'the new discovered path' is the trigger here. AFL gets this trigger with the instrumentation. However, we can also try to monitor for other types of behaviour, which can help us to mutate our inputs. Some of the possible cases can be reaching a particular kernel function (and this feedback can be obtained by setting up a trap at this particular function. 
+
+During this peak time of the project, I had to go for my undergraduate convocation at my university, BITS Pilani Goa. And later during the same week, I had my flights to the States, where I am starting Masters in Information Securiy at Carnegie Mellon University. Juggling with settling down in a new place, going through necessary orientations and preparing for the classes to be taken this current fall, I had a little time left for the final few days of GSoC.
+
+I realised that I really need to figure out how the coverage guided thing actually gives the feedback and what all possible types of feedback can be given back to the AFL. I couldnt find anything on it available in the docs, so had to check out the code.
+
+Struggling through that for a few days and with the end of the project coming nearer, I  thought it might be better that first I implement a simple fuzzer as a proof of concept of hooking syscalls, and restoring snapshots on crash, to which a more sophisticated fuzzer can be plugged into later. After multiple attemps, I was able to create clone VM machines running the kernel-injector script with the arguments that I supply. 
+
+### Current Project State and TODOs:
 If you prefer to not use the automatic generator, push a branch named `gh-pages` to your repository to create a page manually. In addition to supporting regular HTML content, GitHub Pages support Jekyll, a simple, blog aware static site generator written by our own Tom Preston-Werner. Jekyll makes it easy to create site-wide headers and footers without having to copy them across every page. It also offers intelligent blog support and other advanced templating features.
 
 ### Authors and Contributors
