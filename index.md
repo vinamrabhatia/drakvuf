@@ -113,5 +113,14 @@ The main leftover of the project is to make the fuzzer get the feedback from the
 
 ### Learnings from the Project:
 
+This project was definitely the one where I gained a lot of knowledge along the way. 
 
+> Internal working of Windows.
+> Working of a hypervisor, Copy on Write mechanism.
+> Fuzzing, how it works and how it takes the feedback.
+> AFL and the different version available out there.
+> Dynamic Instrumention of Binaries and Emulation of binary code. 
+> Got better in Systems Programming.
+
+Pretty satisfied with my learning over the summer, but would have really liked to have made the integration work. Will continue exploring this as I take up the security classes at CMU. 
 
