@@ -87,7 +87,9 @@ Struggling through that for a few days and with the end of the project coming ne
 
 ### Current Project State and TODOs:
 
-All of the code committed in the project lies in the commits made by @vinamrabhatia handle at https://github.com/vinamrabhatia/drakvuf/tree/kernel_injector .
+#### Code Committed:
+
+All of the code committed in the project lies in the commits made by @vinamrabhatia handle at https://github.com/vinamrabhatia/drakvuf/tree/kernel_injector <a href="https://github.com/vinamrabhatia/drakvuf/tree/kernel_injector"> Link to Code </a>
 
 src/kernel_injector achieves the first half of project, and it takes in the arguments and the function name of the kernel, redirects to that function in the kernel mode and returns back to the normal execution of the function.
 ```
